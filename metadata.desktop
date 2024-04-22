@@ -1,6 +1,6 @@
 [Desktop Entry]
-Name=TypeScript Template
-Comment=A template kwinscript for typescript
+Name=KWin Window Tabbing
+Comment=A script for window tabbing.
 Icon=preferences-system-windows-script-test
 
 Type=Service
@@ -8,11 +8,11 @@ Type=Service
 X-Plasma-API=javascript
 X-Plasma-MainScript=code/main.js
 X-KWin-Border-Activate=false
-X-KDE-PluginInfo-Author=RubixDev
-X-KDE-PluginInfo-Email=rubixdev@mailfence.com
-X-KDE-PluginInfo-Name=typescript-template
-X-KDE-PluginInfo-Version=1.0.0
+X-KDE-PluginInfo-Author=Aziroshin
+X-KDE-PluginInfo-Email=aziroshin@gmx.net
+X-KDE-PluginInfo-Name=kwin-window-tabbing
+X-KDE-PluginInfo-Version=0.0.1
 
-X-KDE-PluginInfo-License=GPL
+X-KDE-PluginInfo-License=GPL-2.0-only
 X-KDE-ServiceTypes=KWin/Script
-X-KDE-PluginKeyword=typescript-template
+X-KDE-PluginKeyword=kwin-window-tabbing

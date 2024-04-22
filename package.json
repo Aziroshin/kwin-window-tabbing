@@ -1,14 +1,14 @@
 {
-  "name": "typescript-template",
-  "displayName": "TypeScript Template",
-  "version": "1.0.0",
-  "description": "A template kwinscript for typescript",
-  "author": "RubixDev",
+  "name": "kwin-window-tabbing",
+  "displayName": "KWin Window Tabbing",
+  "version": "0.0.1",
+  "description": "A script for window tabbing.",
+  "author": "Aziroshin",
   "license": "GPL-2.0-only",
   "main": "contents/code/main.js",
   "scripts": {
     "lint": "tsc --noEmit",
-    "compile": "esbuild --minify --bundle contents/src/main.ts --outfile=contents/code/main.js --format=esm --platform=neutral",
+    "compile": "esbuild --bundle contents/src/main.ts --outfile=contents/code/main.js --format=esm --platform=neutral",
     "package": "scripts/package.sh",
     "install": "[ $npm_command != 'run-script' ] || scripts/install.sh",
     "run": "scripts/start.sh",
@@ -20,9 +20,9 @@
     "update-metadata": "scripts/update_metadata.sh"
   },
   "devDependencies": {
-    "esbuild": "^0.13.14",
     "@types/node": "^20.12.2",
+    "esbuild": "^0.17.19",
     "kwin-types": "^0.1.1",
-    "typescript": "^4.5.2"
+    "typescript": "^4.8.4"
   }
 }
