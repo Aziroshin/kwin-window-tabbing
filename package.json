@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.13.14",
+    "@types/node": "^20.12.2",
     "kwin-types": "^0.1.1",
     "typescript": "^4.5.2"
   }
