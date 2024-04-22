@@ -1,9 +1,39 @@
-node_modules/
+### Project:
 scripts/
-.vscode/
+*.kwinscript
+dev
 
+
+### Tooling: Project
+node_modules/
 .gitignore
 tsconfig.json
 package.json
 package-lock.json
-*.kwinscript
+
+
+### Tooling: Local
+.vscode/
+.idea/
+*.kate-swp
+*.swp
+
+
+### Misc
+.local.*
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

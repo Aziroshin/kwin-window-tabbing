@@ -1,5 +1,20 @@
-node_modules/
+### Project:
 contents/code/
-
-package-lock.json
 *.kwinscript
+
+
+### Tooling: Project
+node_modules/
+#
+package-lock.json
+
+
+### Tooling: Local
+.vscode/
+.idea/
+**.kate-swp
+**.swp
+
+
+### Misc
+**/.local.*
