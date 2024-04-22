@@ -14,6 +14,8 @@
     "run": "scripts/start.sh",
     "publish": "npm run lint && npm run compile && npm run package",
     "start": "npm run lint && npm run compile && npm run package && npm run install && npm run run",
+    "restart": "scripts/update.sh",
+    "restart_with_kwin": "scripts/update_and_restart_kwin.sh",
     "uninstall": "scripts/uninstall.sh",
     "update-metadata": "scripts/update_metadata.sh"
   },
