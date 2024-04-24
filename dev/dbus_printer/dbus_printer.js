@@ -7,6 +7,7 @@ var DBus = require('dbus');
 const SERVICE_NAME = 'com.aziroshin.DBusPrinter'
 const OBJECT_PATH = '/com/aziroshin/DBusPrinter'
 const INTERFACE_NAME = 'Console'
+const RECEIVED = 'RECEIVED'
 
 
 var service = DBus.registerService('session', SERVICE_NAME)
@@ -19,8 +20,9 @@ iface.addMethod(
     {
         in: DBus.Define('Auto'),
     },
-    function (variant) {
+    function (variant, callback) {
         console.log(variant)
+        callback(null, RECEIVED)
     }
 )
 
@@ -30,8 +32,9 @@ iface.addMethod(
     {
         in: DBus.Define('Auto'),
     },
-    function (variant) {
+    function (variant, callback) {
         console.info(variant)
+        callback(null, RECEIVED)
     }
 )
 
@@ -41,8 +44,9 @@ iface.addMethod(
     {
         in: DBus.Define('Auto'),
     },
-    function (variant) {
+    function (variant, callback) {
         console.debug(variant)
+        callback(null, RECEIVED)
     }
 )
 
