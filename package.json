@@ -17,12 +17,16 @@
     "restart": "scripts/restart_script.sh",
     "restart_with_kwin": "scripts/restart_script_and_kwin.sh",
     "uninstall": "scripts/uninstall.sh",
-    "update-metadata": "scripts/update_metadata.sh"
+    "update-metadata": "scripts/update_metadata.sh",
+    "dbus_printer": "node dev/dbus_printer/dbus_printer.js"
   },
   "devDependencies": {
     "@types/node": "^20.12.2",
     "esbuild": "^0.17.19",
     "kwin-types": "^0.1.1",
     "typescript": "^4.8.4"
+  },
+  "dependencies": {
+    "dbus": "^1.0.7"
   }
 }
