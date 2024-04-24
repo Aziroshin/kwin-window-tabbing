@@ -6,6 +6,5 @@ npm run lint\
 && scripts/uninstall.sh\
 && scripts/package.sh\
 && scripts/install.sh\
-&& scripts/load.sh\
-&& scripts/enable.sh
+&& scripts/start.sh
 scripts/status.sh
