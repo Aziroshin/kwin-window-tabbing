@@ -1,7 +1,8 @@
-print('Hello, World!')
+import dbg from "./dbg";
 
-for (let client of workspace.clientList()) {
-    print(client.resourceClass, client.caption)
-    if (client.resourceClass.toString() === 'plasmashell')
-        console.info(`-> ${client.windowId}`)
+var main = function(): void {
+    dbg.log("🎉")
 }
+
+
+main();
