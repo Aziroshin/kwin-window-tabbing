@@ -14,10 +14,10 @@ enum GroupingState {
 class Store {
     tabbee: WrappedWindow
     grouping_state: GroupingState
-    windows: WrappedWindows
+    windows: WrappedStoreWindows
 
     constructor() {
-        this.windows = new WrappedWindows()
+        this.windows = new WrappedStoreWindows()
         this.grouping_state = GroupingState.SelectingTabbee
         this.tabbee = this.windows.get_wrapped(workspace.activeClient)
     }
@@ -184,7 +184,7 @@ class WrappedWindow {
     kwin_window: KWin.AbstractClient
     group: Group
 
-    constructor(
+    private constructor(
         kwin_window: KWin.AbstractClient,
         group: Group | null = null
     ) {
@@ -195,6 +195,24 @@ class WrappedWindow {
         } else {
             this.group = group
         }
+    }
+
+    
+    static new_or_get_wrapped_store_bound(
+        store_windows: WrappedStoreWindows,
+        kwin_window: KWin.AbstractClient,
+        group: | null = null
+    ): WrappedWindow {
+        let maybe_wrapped_window = store_windows.all.find((wrapped_window) => {
+            return wrapped_window.kwin_window.windowId == kwin_window.windowId
+        })
+        if (maybe_wrapped_window) {
+            return maybe_wrapped_window
+        }
+        
+        let new_wrapped = new WrappedWindow(kwin_window, group)
+        store_windows.all.push(new_wrapped)
+        return new_wrapped
     }
 
     /** Is this window grouped with at least one other window? */
@@ -233,25 +251,6 @@ class WrappedWindows {
         })
     }
 
-    // This should probably be on a sub-class that is only used on the store,
-    // since there should only be one source of `WrappedWindow`, to make sure
-    // each KWin window only has one unique wrapper.
-    /** Get an existing handler corresponding to `window` or get a new one.
-     * This is the principal method for getting a `WrappedWindow`.
-     * */
-    get_wrapped(kwin_window: KWin.AbstractClient): WrappedWindow {
-        let maybe_wrapped_window = this.all.find((wrapped_window) => {
-            return wrapped_window.kwin_window.windowId == kwin_window.windowId
-        })
-        if (maybe_wrapped_window) {
-            return maybe_wrapped_window
-        }
-        
-        let new_wrapped = new WrappedWindow(kwin_window)
-        this.all.push(new_wrapped)
-        return new_wrapped
-    }
-
     add_window(window: WrappedWindow): void {
         this.all.push(window)
     }
@@ -278,6 +277,17 @@ class WrappedWindows {
             }
         }
         return highest_window
+    }
+}
+
+
+class WrappedStoreWindows extends WrappedWindows {
+    /** Get an existing handler corresponding to `window` or get a new one.
+     * This is the principal method for getting a `WrappedWindow`.
+     * */
+    get_wrapped(kwin_window: KWin.AbstractClient): WrappedWindow {
+        let new_wrapped = WrappedWindow.new_or_get_wrapped_store_bound(this, kwin_window)
+        return new_wrapped
     }
 }
 
