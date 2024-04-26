@@ -1,6 +1,6 @@
 var config = {
     // Use `print` from the KWin scripting API for printing?
-    print_using_print: true,
+    print_using_print: false,
     // Use `console` for printing?
     print_using_console: false,
     // Use DBus for printing?
