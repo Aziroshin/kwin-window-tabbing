@@ -4,7 +4,7 @@ import dbg from "./dbg";
 type SignalCallbackType<S> = S extends Signal<infer C> ? C : never
 
 
-enum GroupingSelectorState {
+enum GroupingState {
     Disabled,
     SelectingTabbee,
     SelectingTarget
@@ -13,17 +13,30 @@ enum GroupingSelectorState {
 
 class Store {
     tabbee: WrappedWindow
-    grouping_selector_state: GroupingSelectorState
+    grouping_state: GroupingState
     windows: WrappedWindows
 
     constructor() {
         this.windows = new WrappedWindows()
-        this.grouping_selector_state = GroupingSelectorState.SelectingTabbee
+        this.grouping_state = GroupingState.SelectingTabbee
         this.tabbee = this.windows.get_wrapped(workspace.activeClient)
     }
 }
 
-
+// The current design for groups is that they're immediately associated with
+// a window the moment the script creates a handler for it. This is a mixed
+// bag: 
+//   - The advange is that we can rely on there being a group at all times,
+//   and write the rest of the code around that assumption.
+//   - The disadvantage is that it moves some of the mess we'd otherwise
+//   have elsewhere into this class, and it makes it less clear in the rest of
+//   the code whether we have a "proper" group with two or more windows,
+//   a pseudo-group with one window or an empty group. The latter case at least
+//   should only happen in obvious edge cases such as when (de)initializing
+//   something. It should be the aim to encapsulate the fallout of these
+//   problems as much possible from the rest of the program.
+/** A group of windows that resize and move together.
+ */
 class Group {
     private awake: boolean
     protected windows: WrappedWindows
@@ -50,6 +63,20 @@ class Group {
         return this.windows.has_window(window)
     }
 
+    // TODO: Rework the whole top window thing to depend on the window
+    // returned by `this.get_top_window()`, which should return the
+    // window with the highest stackingOrder. The callback management
+    // in this function should be triggered whenever the stacking order
+    // is changed in a way that puts a new window (in the group) at the
+    // top. This could be managed/triggered using callbacks for
+    // `stackingOrderChanged` (which would be managed somewhere else, I guess).
+    //
+    // Keeping some stack order information on hand could be useful, either
+    // in an int, or an array sorted by stacking order.
+    //
+    // Another approach might be the windows managing themselves, connecting
+    // and disconnecting the resize callback depending on whether they're
+    // atop their group.
     set_top_window(window: WrappedWindow | null): boolean {
         if (window !== null && !this.windows.has_window(window)) {
             return false
@@ -66,17 +93,8 @@ class Group {
         } else if (this.has_two_or_more_windows()) {
             this.top_window = window
             this.on_top_window_changed_resize_all_callback = (toplevel): void => {
-                dbg.log("=== Resizing all windows ===")
-                dbg.log("Current top window for this group: " + this.top_window?.kwin_window.caption)
-                dbg.log("in callback: Current window count: " + this.windows.all.length)
                 this.windows.all.forEach((window_) => {
-                    window_.kwin_window.frameGeometry = {
-                        x: toplevel.frameGeometry.x,
-                        y: toplevel.frameGeometry.y,
-                        width: toplevel.frameGeometry.width,
-                        height: toplevel.frameGeometry.height,
-                    }
-                    dbg.log("Resized width: " + window_.kwin_window.frameGeometry.width + " for window: " + window_.kwin_window.caption)
+                    window_.kwin_window.frameGeometry = toplevel.frameGeometry
                 })
             }
             window.kwin_window.clientGeometryChanged.connect(
@@ -101,7 +119,7 @@ class Group {
     has_two_or_more_windows(): boolean {
         return this.windows.all.length >= 2
     }
-
+    
     ensure_correct_top_window(): void {
         this.set_top_window(this.windows.get_top_stack_window())
     }
@@ -115,25 +133,18 @@ class Group {
             return false
         }
 
-        let top_stack_window = this.windows.get_top_stack_window()
+        // If we'd get that after adding the window, it'd be included when
+        // determining the window atop the stack, and very likely be it.
+        let top_stack_window_before_adding = this.windows.get_top_stack_window()
         this.windows.add_window(window)
 
-        if (request_top || this.windows.all.length == 1) {
-            workspace.activeClient = window.kwin_window
-        } else if (this.has_two_or_more_windows()) {
-            if (top_stack_window) {
-                workspace.activeClient = top_stack_window.kwin_window
+        if (!request_top && this.has_two_or_more_windows()) {
+            if (top_stack_window_before_adding) {
+                workspace.activeClient = top_stack_window_before_adding.kwin_window
             }
-/*             let maybe_other_window = this.windows.all.find((prospective_window) => {
-                prospective_window !== window
-            })
-            if (maybe_other_window) {
-                workspace.activeClient = maybe_other_window.kwin_window
-            } */
         }
         this.ensure_correct_top_window()
         this.evaluate_wakeness()
-        dbg.log("Current window count: " + this.windows.all.length)
         
         return true
     }
@@ -164,6 +175,11 @@ class Group {
 }
 
 
+/** A wrapper for `KWin.AbstractClient`. Whenever possible, code
+ * throughout the code base will use this, and when variable names contain
+ * "window", that's what that refers to. Variables directly referring to
+ * a `KWin.AbstractClient` object would contain `kwin_window` instead.
+ * */
 class WrappedWindow {
     kwin_window: KWin.AbstractClient
     group: Group
@@ -181,10 +197,14 @@ class WrappedWindow {
         }
     }
 
+    /** Is this window grouped with at least one other window? */
     is_grouped(): boolean {
         return this.group.has_two_or_more_windows()
     }
 
+    /** Move this window into the target window's group.
+     * This is the principal method for grouping windows.
+     * */
     group_with(target_window: WrappedWindow): void {
         this.group.remove_window(this)
         target_window.group.add_window(this, true)
@@ -194,6 +214,7 @@ class WrappedWindow {
 
 
 class WrappedWindows {
+    // TODO: Makes this class an iterable.
     all: Array<WrappedWindow>
 
     constructor() {
@@ -215,7 +236,9 @@ class WrappedWindows {
     // This should probably be on a sub-class that is only used on the store,
     // since there should only be one source of `WrappedWindow`, to make sure
     // each KWin window only has one unique wrapper.
-    /** Get an existing handler corresponding to `window` or get a new one. */
+    /** Get an existing handler corresponding to `window` or get a new one.
+     * This is the principal method for getting a `WrappedWindow`.
+     * */
     get_wrapped(kwin_window: KWin.AbstractClient): WrappedWindow {
         let maybe_wrapped_window = this.all.find((wrapped_window) => {
             return wrapped_window.kwin_window.windowId == kwin_window.windowId
@@ -224,7 +247,6 @@ class WrappedWindows {
             return maybe_wrapped_window
         }
         
-        dbg.log("Making new wrapper for: " + kwin_window.caption)
         let new_wrapped = new WrappedWindow(kwin_window)
         this.all.push(new_wrapped)
         return new_wrapped
@@ -243,6 +265,7 @@ class WrappedWindows {
         }
     }
 
+    /** Get the window at the top of the stacking order. */
     get_top_stack_window(): WrappedWindow | null {
         let highest_window: WrappedWindow | null = null
         for (let window of this.all) {
@@ -273,33 +296,18 @@ var store = new Store()
 
 
 var grouping_key_callback = function(): void {
-    if (store.grouping_selector_state == GroupingSelectorState.SelectingTabbee) {
-        dbg.log(">>Grouping state: SelectingTabbee - now switching to SelectingTarget")
+    if (store.grouping_state == GroupingState.SelectingTabbee) {
         store.tabbee = store.windows.get_wrapped(workspace.activeClient)
-        store.grouping_selector_state = GroupingSelectorState.SelectingTarget
-    } else if (store.grouping_selector_state == GroupingSelectorState.SelectingTarget) {
-        dbg.log("Calling get_wrapped in target grouping...")
+        store.grouping_state = GroupingState.SelectingTarget
+    } else if (store.grouping_state == GroupingState.SelectingTarget) {
         let target = store.windows.get_wrapped(workspace.activeClient)
         if (target === store.tabbee) {
-            store.grouping_selector_state = GroupingSelectorState.SelectingTabbee
+            store.grouping_state = GroupingState.SelectingTabbee
             return
         }
-        
         store.tabbee.group_with(target)
-        store.tabbee.kwin_window.frameGeometry = {
-            x: target.kwin_window.frameGeometry.x,
-            y: target.kwin_window.frameGeometry.y,
-            width: target.kwin_window.frameGeometry.width,
-            height: target.kwin_window.frameGeometry.height,
-        }
-        
-        dbg.log("tabbee name: " + store.tabbee.kwin_window.caption)
-        dbg.log(">>Grouping state: SelectingTarget - now switching to SelectingTabbee.")
-
-        store.grouping_selector_state = GroupingSelectorState.SelectingTabbee
-    }
-    for (let window of store.windows.all) {
-        dbg.log("Windows found: " + window.kwin_window.caption)
+        store.tabbee.kwin_window.frameGeometry = target.kwin_window.frameGeometry
+        store.grouping_state = GroupingState.SelectingTabbee
     }
 }
 
@@ -309,6 +317,7 @@ var main = function(): void {
         // TODO [bug]: Title doesn't show up in system setings.
         'Grouping Key',
         // TODO: Description is too long for system settings.
+        // Title included is included here for now.
         'Grouping Key: First use selects focused window for getting tabbed, second use selects a window to tab it to.',
         // TODO [bug]: Somehow the shortcut doesn't get set - for now, we have to
         //   set the shortcut ourselves in the system settings.
