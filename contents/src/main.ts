@@ -138,10 +138,17 @@ class Group {
         let top_stack_window_before_adding = this.windows.get_top_stack_window()
         this.windows.add_window(window)
 
-        if (!request_top && this.has_two_or_more_windows()) {
-            if (top_stack_window_before_adding) {
-                workspace.activeClient = top_stack_window_before_adding.kwin_window
+        if (this.has_two_or_more_windows()) {
+            if (request_top) {
+                workspace.activeClient = window.kwin_window
+            } else {
+                if (top_stack_window_before_adding) {
+                    workspace.activeClient = top_stack_window_before_adding.kwin_window
+                }
             }
+        }
+        if (!request_top && this.has_two_or_more_windows()) {
+
         }
         this.ensure_correct_top_window()
         this.evaluate_wakeness()
