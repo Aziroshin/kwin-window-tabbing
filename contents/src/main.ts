@@ -115,17 +115,21 @@ class Group {
             return false
         }
 
+        let top_stack_window = this.windows.get_top_stack_window()
         this.windows.add_window(window)
 
         if (request_top || this.windows.all.length == 1) {
             workspace.activeClient = window.kwin_window
-        } else if (this.windows.all.length == 2) {
-            let maybe_other_window = this.windows.all.find((prospective_window) => {
+        } else if (this.has_two_or_more_windows()) {
+            if (top_stack_window) {
+                workspace.activeClient = top_stack_window.kwin_window
+            }
+/*             let maybe_other_window = this.windows.all.find((prospective_window) => {
                 prospective_window !== window
             })
             if (maybe_other_window) {
                 workspace.activeClient = maybe_other_window.kwin_window
-            }
+            } */
         }
         this.ensure_correct_top_window()
         this.evaluate_wakeness()
