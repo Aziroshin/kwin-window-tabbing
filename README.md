@@ -1,78 +1,19 @@
-# KWin TypeScript Template
-A template for creating KWin scripts in typescript, because the official docs [here](https://develop.kde.org/docs/plasma/kwin/) and [here](https://develop.kde.org/docs/plasma/kwin/api/) aren't *quite* perfect.
+# kwin-window-tabbing
+An attempt at window tabbing for KWin. Currently in its initial stage of development and not yet usable.
 
-It uses [my type declarations](https://github.com/RubixDev/kwin-types), that I created based mainly by looking through [KWin's source code](https://github.com/KDE/kwin) and the docs mentioned above.
+Based on [this](https://github.com/RubixDev/kwin-typescript-template) TypeScript KWin scripting template and [type definitions](https://github.com/RubixDev/kwin-types) by [RubixDev](https://github.com/RubixDev). Refer to their READMEs, especially [section 5](https://github.com/RubixDev/kwin-typescript-template?tab=readme-ov-file#step-5) of the template.
 
-## Usage
-### Setup
-#### Step 1
-Clone the repo:
-```bash
-git clone https://github.com/RubixDev/kwin-typescript-template.git
-```
+## What Works:
+- Adding windows to a group using a shortcut.
+- All windows in a group getting resized in unison.
 
-#### Step 2
-Edit the following things in the `package.json`
-- `name`
-- `displayName`
-- `version`
-- `description`
-- `author`
-
-and if you really want, also the `license`.
-
-#### Step 3
-Edit the `metadata.desktop` file. For convenience you can run `npm run update-metadata` to copy the the information from the `package.json` automatically. However you still have to edit these properties manually:
-- `X-KDE-PluginInfo-Email`
-- `X-KDE-PluginInfo-License`
-
-#### Step 4
-Run `npm i` to install the required dependencies.
-
-#### Step 5
-Write your script in the `contents/src/main.ts` file. You can also add more files and import them with the typical `import { stuff } from 'elsewhere'` syntax.
-
-There are a few global properties and functions:
-- Functions (refer to the JSDoc for more information)
-  - `print()`
-  - `readConfig()`
-  - `callDBus()`
-  - `registerShortcut()`
-  - `registerScreenEdge()`
-  - `unregisterScreenEdge()`
-  - `registerTouchScreenEdge()`
-  - `unregisterTouchScreenEdge()`
-  - `registerUserActionsMenu()`
-  - `assert()`
-  - `assertTrue()`
-  - `assertFalse()`
-  - `assertNull()`
-  - `assertNotNull()`
-  - `assertEquals()`
-- `workspace`: An instance of `KWin.QtScriptWorkspaceWrapper`
-- `options`: An instance of `KWin.Options`
-- `KWin`: has the following properties, that provide access to the properties of the `KWin.WorkspaceWrapper.ClientAreaOption` and `KWin.WorkspaceWrapper.ElectricBorder` enums:
-  - `PlacementArea`
-  - `MovementArea`
-  - `MaximizeArea`
-  - `MaximizeFullArea`
-  - `FullScreenArea`
-  - `WorkArea`
-  - `FullArea`
-  - `ScreenArea`
-  - `ElectricTop`
-  - `ElectricTopRight`
-  - `ElectricRight`
-  - `ElectricBottomRight`
-  - `ElectricBottom`
-  - `ElectricBottomLeft`
-  - `ElectricLeft`
-  - `ElectricTopLeft`
-  - `ELECTRIC_COUNT`
-  - `ElectricNone`
-- `QTimer`: A class, for calling a function repeatedly with an interval, or just once with a delay.
-
-Keep in mind async/await won't work. It seems like any call to `setTimeout()` or similar functions results in an internal error and cancels further execution of that scope.
+## Setup
+### Notes
+- If you use nvm, there's an `.nvmrc`.
+- Run `npm i` to install the required dependencies.
+- The KWin script sources are in `contents/src`.
+- `npm run dbus_printer` will start a DBus service the KWin script may print to using `dbg.log`, `dbg.info` or `dbg.debug`.
+- `npm run start` will recompile/load the script.
 
 ### NPM Scripts
 #### lint
@@ -89,6 +30,12 @@ Installs the packaged script to your system
 
 #### run
 Enables the installed script and starts it. The output can be seen via `journalctl -f`
+
+#### status
+Shows the current install & load status of the script.
+
+#### dbus_printer
+Starts a DBus service that prints the messages it receives to the console. The source can be found [here](dev/dbus_printer/dbus_printer.js). To send messages to it from the KWin script, either use `dbg.log("example")`, `dbg.info("example")` or `dbg.debug("example")`. An example of how to send messages to it from the command line can be found [here](dev/dbus_printer/scripts/test_dbus_printer.sh). 
 
 #### publish
 Executes these scripts:
