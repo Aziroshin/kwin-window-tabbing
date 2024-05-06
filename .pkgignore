@@ -1,12 +1,12 @@
 ### Project:
-scripts/
 *.kwinscript
-dev
 
 
 ### Tooling: Project
 node_modules/
 .gitignore
+.git
+.gitattributes
 tsconfig.json
 package.json
 package-lock.json
