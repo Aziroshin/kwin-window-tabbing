@@ -312,7 +312,7 @@ var isWindowHandler = (item: WrappedWindow | KWin.AbstractClient): item is Wrapp
 var store = new Store()
 
 
-var grouping_key_callback = function(): void {
+var grouping_action_callback = function(): void {
     if (store.grouping_state == GroupingState.SelectingTabbee) {
         store.tabbee = store.windows.get_wrapped(workspace.activeClient)
         store.grouping_state = GroupingState.SelectingTarget
@@ -329,9 +329,29 @@ var grouping_key_callback = function(): void {
 }
 
 
+var ungrouping_action_callback = function(): void {
+    dbg.debug('NOT IMPLEMENTED: ungrouping_action_callback.')
+}
+
+
+var cycle_forward_action_callback = function(): void {
+    dbg.debug('NOT IMPLEMENTED: cycle_forward_action_callback.')
+}
+
+
+var cycle_backward_action_callback = function(): void {
+    dbg.debug('NOT IMPLEMENTED: cycle_backward_action_callback.')
+}
+
+
 var main = function(): void {
+    // TODO: There are some comments below about which keys are getting registered
+    //   and which aren't - this probably depends on one's setup and might differ
+    //   between setups. Figure out what the problem is and fix it. It doesn't seem
+    //   to be tied to existing shortcuts, at least not ones that can be found in
+    //   the `Shortcuts` control panel using the search bar.
     registerShortcut(
-        // TODO [bug]: Title doesn't show up in system setings.
+        // TODO [bug]: Title doesn't show up in system settings.
         'Grouping Key',
         // TODO: Description is too long for system settings.
         // Title included is included here for now.
@@ -339,8 +359,29 @@ var main = function(): void {
         // TODO [bug]: Somehow the shortcut doesn't get set - for now, we have to
         //   set the shortcut ourselves in the system settings.
         'Meta+Space',
-        grouping_key_callback
-    )
+        grouping_action_callback
+    );
+    registerShortcut(
+        'Ungrouping Key',
+        'Ungrouping Key: Removes the focused window from its group.',
+        // Interestingly, this one is getting registered right away.
+        'Meta+Alt+Space',
+        ungrouping_action_callback
+    );
+    registerShortcut(
+        'Cycle Forward Key',
+        'Cycle Forward Key: Switches one window to the left in its group.',
+        // This one gets registered as well.
+        'Meta+Alt+F',
+        cycle_forward_action_callback
+    );
+    registerShortcut(
+        'Cycle Backward Key',
+        'Cycle Backward Key: Switches one window to the right in its group.',
+        // This one doesn't get registered.
+        'Meta+Alt+C',
+        cycle_forward_action_callback
+    );
 }
 
 

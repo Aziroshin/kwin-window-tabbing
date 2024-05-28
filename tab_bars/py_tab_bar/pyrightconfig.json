@@ -1,0 +1,10 @@
+{
+  "pythonVersion": "3.12",
+  "ignore": [],
+  "extraPaths": [],
+  "venvPath": ".venv",
+  "typeCheckingMode": "strict",
+  "verboseOutput": true,
+  "stubPath": "",
+  "root_dir": "."
+}
