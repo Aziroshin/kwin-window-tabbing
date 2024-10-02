@@ -241,7 +241,7 @@ class WrappedWindow {
     static new_or_get_wrapped_store_bound(
         store_windows: WrappedStoreWindows,
         kwin_window: KWin.AbstractClient,
-        group: | null = null
+        group: Group | null = null
     ): WrappedWindow {
         let maybe_wrapped_window = store_windows.all.find((wrapped_window) => {
             return wrapped_window.kwin_window.windowId == kwin_window.windowId
