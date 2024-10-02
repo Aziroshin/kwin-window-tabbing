@@ -4,6 +4,29 @@ import dbg from "./dbg";
 type SignalCallbackType<S> = S extends Signal<infer C> ? C : never
 
 
+class CallbackLockupWorkaroundTracker {
+    counter: number
+    last_seen_count: number
+    times_seen_counter_frozen: number
+    timer?: QTimer
+
+    constructor() {
+        this.counter = 0
+        this.last_seen_count = 0
+        this.times_seen_counter_frozen = 0
+    }
+}
+
+
+type CallbackLockupWorkaroundTrackers<TCallbackNames extends string> = {
+    [T in TCallbackNames]: {
+        counter: number
+        last_seen_count: number
+        times_seen_counter_frozen: number
+    }
+}
+
+
 enum GroupingState {
     Disabled,
     SelectingTabbee,
@@ -15,18 +38,28 @@ class Store {
     tabbee: WrappedWindow
     grouping_state: GroupingState
     windows: WrappedStoreWindows
+    test_count: number
+    test_count_2: number
+    callback_lockup_workaround_trackers: CallbackLockupWorkaroundTrackers<
+        | "dbus_queue_polling_timer"
+    >
 
     constructor() {
         this.windows = new WrappedStoreWindows()
         this.grouping_state = GroupingState.SelectingTabbee
         this.tabbee = this.windows.get_wrapped(workspace.activeClient)
+        this.test_count = 0
+        this.test_count_2 = 0
+        this.callback_lockup_workaround_trackers = {
+            dbus_queue_polling_timer: new CallbackLockupWorkaroundTracker()
+        }
     }
 }
 
 // The current design for groups is that they're immediately associated with
 // a window the moment the script creates a handler for it. This is a mixed
 // bag: 
-//   - The advange is that we can rely on there being a group at all times,
+//   - The advantage is that we can rely on there being a group at all times,
 //   and write the rest of the code around that assumption.
 //   - The disadvantage is that it moves some of the mess we'd otherwise
 //   have elsewhere into this class, and it makes it less clear in the rest of
@@ -304,7 +337,7 @@ var isKWinWindow = (item: WrappedWindow | KWin.AbstractClient): item is KWin.Abs
 }
 
 
-var isWindowHandler = (item: WrappedWindow | KWin.AbstractClient): item is WrappedWindow => {
+var isWrappedWindow = (item: WrappedWindow | KWin.AbstractClient): item is WrappedWindow => {
     return !isKWinWindow(item)
 }
 
@@ -313,6 +346,7 @@ var store = new Store()
 
 
 var grouping_action_callback = function(): void {
+    dbg.log("grouping_action_callback called.")
     if (store.grouping_state == GroupingState.SelectingTabbee) {
         store.tabbee = store.windows.get_wrapped(workspace.activeClient)
         store.grouping_state = GroupingState.SelectingTarget
@@ -341,6 +375,53 @@ var cycle_forward_action_callback = function(): void {
 
 var cycle_backward_action_callback = function(): void {
     dbg.debug('NOT IMPLEMENTED: cycle_backward_action_callback.')
+}
+
+
+//=========================================================================
+// BEGIN: DBus Queue Polling Functions
+//=========================================================================
+
+var dbus_queue_polling_callback = function(): void {
+    store.test_count += 1
+    if (store.test_count % 10 == 0) {
+        dbg.log("dbus_queue_polling_callback called. Test count: " + store.test_count)
+    }
+}
+
+
+var start_dbus_queue_polling = function(timer: QTimer): void {
+    timer.interval = 1.0
+    timer.timeout.connect(dbus_queue_polling_callback)
+    timer.start()
+}
+
+
+var stop_dbus_queue_polling = function(timer: QTimer): void {
+    timer.timeout.disconnect(dbus_queue_polling_callback)
+}
+
+
+var set_up_dbus_queue_polling = function(): void {
+
+}
+
+
+var reset_dbus_queue_polling = function(): void {
+    store.callback_lockup_workaround_trackers.dbus_queue_polling_timer
+}
+
+
+//=========================================================================
+// END: DBus Queue Polling Functions
+//=========================================================================
+
+
+var test_timer_callback = function(): void {
+    store.test_count_2 += 1
+    if (store.test_count_2 % 1000 == 0) {
+        dbg.debug("test_timer_callback called. Test count: " + store.test_count_2)
+    }
 }
 
 
@@ -382,6 +463,16 @@ var main = function(): void {
         'Meta+Alt+C',
         cycle_forward_action_callback
     );
+    
+    let dbus_queue_polling_timer = new QTimer();
+    dbus_queue_polling_timer.interval = 2.0
+    dbus_queue_polling_timer.timeout.connect(dbus_queue_polling_callback)
+    dbus_queue_polling_timer.start()
+    
+    let test_timer = new QTimer();
+    test_timer.interval = 4.0
+    test_timer.timeout.connect(test_timer_callback)
+    test_timer.start()
 }
 
 

@@ -1,7 +1,12 @@
 import config from "./config";
 
 var dbus_console = {
-    _dummy_callback: function(): void {},
+    _status_callback: function(status: any): void {
+        //this.debug("_status_callback of dbus_console called with args: a: " + status + ".")
+        if (status !== 'RECEIVED') {
+            this.debug('DBus debug connection failed.')
+        }
+    },
     _call(method_name: string, item: any): void {
         callDBus(
             config.dbus_console_service,
@@ -10,7 +15,7 @@ var dbus_console = {
                 + '.' + config.dbus_console_interface,
             method_name,
             item,
-            this._dummy_callback
+            this._status_callback
         )
     },
     log: function(item: any): void {

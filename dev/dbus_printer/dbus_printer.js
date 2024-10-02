@@ -19,6 +19,7 @@ iface.addMethod(
     'log',
     {
         in: DBus.Define('Auto'),
+        out: DBus.Define(String)
     },
     function (variant, callback) {
         console.log(variant)
@@ -31,6 +32,7 @@ iface.addMethod(
     'info',
     {
         in: DBus.Define('Auto'),
+        out: DBus.Define(String),
     },
     function (variant, callback) {
         console.info(variant)
@@ -43,6 +45,7 @@ iface.addMethod(
     'debug',
     {
         in: DBus.Define('Auto'),
+        out: DBus.Define(String)
     },
     function (variant, callback) {
         console.debug(variant)
