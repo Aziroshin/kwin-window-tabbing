@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from typing import Generic, Iterator, List, Optional, TypeVar
 
