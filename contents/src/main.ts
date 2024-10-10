@@ -240,11 +240,11 @@ class WrappedWindow {
             this.group = new Group()
             this.group.add_window(this, true)
         } else {
+            // TODO: What if the window isn't a part of this group?
             this.group = group
         }
     }
 
-    
     static new_or_get_wrapped_store_bound(
         store_windows: WrappedStoreWindows,
         kwin_window: KWin.AbstractClient,
@@ -366,6 +366,20 @@ var grouping_action_callback = function(): void {
         store.tabbee.group_with(target)
         store.tabbee.kwin_window.frameGeometry = target.kwin_window.frameGeometry
         store.grouping_state = GroupingState.SelectingTabbee
+        
+        // TODO: Update group on the tab_bar service via DBus. Each update
+        //   is to contain the group ID and a list of windows, whereas the 
+        //   window objects in that list each contain a window ID, title and
+        //   optional icon information of some kind.
+        //   What about group resizing and repositioning, though? It would be
+        //   potentially slow to send and process big updates like that at such
+        //   a rate - maybe these are different DBus messages, and if the group
+        //   isn't recognizd on the other end, it just drops it? That could 
+        //   potentially lead to desyncs, though.
+        //
+        //   Problem: Updates could still be sent out of order (?) and
+        //   overwrite newer updates. Maybe there's no way around numbering
+        //   messages.
     }
 }
 
@@ -392,7 +406,8 @@ var cycle_backward_action_callback = function(): void {
 var dbus_queue_polling_callback = function(): void {
     store.test_count += 1
     if (store.test_count % 10 == 0) {
-        dbg.log("dbus_queue_polling_callback called. Test count: " + store.test_count)
+        //dbg.debug(new Group().get_id())
+        //dbg.log("dbus_queue_polling_callback called. Test count: " + store.test_count)
     }
 }
 
@@ -427,7 +442,7 @@ var reset_dbus_queue_polling = function(): void {
 var test_timer_callback = function(): void {
     store.test_count_2 += 1
     if (store.test_count_2 % 1000 == 0) {
-        dbg.debug("test_timer_callback called. Test count: " + store.test_count_2)
+        //dbg.debug("test_timer_callback called. Test count: " + store.test_count_2)
     }
 }
 

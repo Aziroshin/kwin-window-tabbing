@@ -1,5 +1,9 @@
 import config from "./config";
 
+
+let dbus_config = config.dbus_services.dbus_console
+
+
 var dbus_console = {
     _status_callback: function(status: any): void {
         //this.debug("_status_callback of dbus_console called with args: a: " + status + ".")
@@ -9,23 +13,23 @@ var dbus_console = {
     },
     _call(method_name: string, item: any): void {
         callDBus(
-            config.dbus_console_service,
-            config.dbus_console_object,
-            config.dbus_console_service
-                + '.' + config.dbus_console_interface,
+            dbus_config.service,
+            dbus_config.object,
+            dbus_config.service
+                + '.' + dbus_config.interfaces.console.name,
             method_name,
             item,
             this._status_callback
         )
     },
     log: function(item: any): void {
-        this._call(config.dbus_console_log_method_name, item)
+        this._call(dbus_config.interfaces.console.methods.log, item)
     },
     info: function(item: any): void {
-        this._call(config.dbus_console_info_method_name, item)
+        this._call(dbus_config.interfaces.console.methods.info, item)
     },
     debug: function(item: any): void {
-        this._call(config.dbus_console_debug_method_name, item)
+        this._call(dbus_config.interfaces.console.methods.debug, item)
     }
 }
 

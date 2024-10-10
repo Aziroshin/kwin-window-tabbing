@@ -5,12 +5,38 @@ var config = {
     print_using_console: false,
     // Use DBus for printing?
     print_using_dbus: true,
-    dbus_console_service: 'com.aziroshin.DBusPrinter',
-    dbus_console_object: '/com/aziroshin/DBusPrinter',
-    dbus_console_interface: 'Console',
-    dbus_console_log_method_name: 'log',
-    dbus_console_info_method_name: 'info',
-    dbus_console_debug_method_name: 'debug'
-}
+    
+    // DBus services we're going to use using `callDBus`.
+    dbus_services: {
+        dbus_console: {
+            service: "com.aziroshin.DBusPrinter",
+            object: "/com/aziroshin/DBusPrinter",
+            interfaces: {
+                console: {
+                    name: "Console",
+                    methods: {
+                        log: "log",
+                        info: "info",
+                        debug: "debug",
+                    }
+                }
+            }
+        },
+        tab_bar: {
+            service: "com.aziroshin.KWinWindowTabbingTabBar",
+            object: "/com/aziroshin/KWinWindowTabbingTabBar",
+            interfaces: {
+                tab_bar: {
+                    name: "TabBar",
+                    methods: {
+                        pop_commands_queued_for_kwin: "popCommandsQueuedForKwin",
+                        put_groups: "putGroups",
+                        test: "test"
+                    }
+                }
+            }
+        }
+    }
+} as const
 
 export default config

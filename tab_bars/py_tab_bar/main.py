@@ -4,22 +4,24 @@
 # Needs PySide2-stubs installed to typecheck properly.
 
 
-# Python
+# Imports: Python
 import sys
 from types import TracebackType
 from typing import Optional, Type
+
+# Imports: Third Party
 from PySide2.QtCore import QRect
 from PySide2.QtWidgets import QApplication, QTabWidget, QWidget
-# Project
+from dbus_fast.aio.message_bus import MessageBus
+from dbus_fast.service import ServiceInterface, method
+
+# Imports: Project
 from record import Record, RecordCollection
+from dbus_fast_types import s
 
 
 DEVFIXTURE_rect = QRect(300, 500, 200, 200)
 DEVFIXTURE_bar_offset = 50
-
-
-class NonExistentBar(Exception):
-    pass
 
 
 class ContextManagedQTabWidget(QTabWidget):
@@ -114,6 +116,18 @@ class Group(Record):
 # Misc notes:
 # - The name for the event responder function for a window getting grouped
 # should probably be `on_window_grouped`.
+
+
+class TabBarDBusInterface(ServiceInterface):
+    def __init__(self, name: str):
+        super().__init__(name)
+
+    # List of groups.
+    @method()
+    def PutGroups(
+        self
+    ) -> "s":
+        return ""
 
 
 if __name__ == "__main__":
