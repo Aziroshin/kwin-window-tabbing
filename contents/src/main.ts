@@ -1,4 +1,5 @@
 import dbg from "./dbg";
+import { ID } from "./id";
 
 
 type SignalCallbackType<S> = S extends Signal<infer C> ? C : never
@@ -72,6 +73,7 @@ class Store {
  */
 class Group {
     private awake: boolean
+    protected id: ID
     protected windows: WrappedWindows
     protected top_window: WrappedWindow | null
     on_top_window_changed_resize_all_callback:
@@ -79,9 +81,14 @@ class Group {
         | undefined
 
     constructor() {
+        this.id = new ID()
         this.windows = new WrappedWindows()
         this.awake = false
         this.top_window = null
+    }
+
+    get_id(): ID {
+        return this.id
     }
 
     is_empty(): boolean {
