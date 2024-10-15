@@ -18,6 +18,10 @@ class ID {
         last_generated_id_epoch = this.epoch
         last_generated_id_disambiguator = this.disambiguator
     }
+
+    as_string(): string {
+        return this.epoch + "_" + this.disambiguator
+    }
 }
 
 
