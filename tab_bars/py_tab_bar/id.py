@@ -2,7 +2,7 @@
 
 # Import: Python
 import datetime
-from typing import Any, overload
+from typing import Any, NamedTuple, overload
 
 
 def get_millisecond_epoch() -> int:
@@ -10,12 +10,22 @@ def get_millisecond_epoch() -> int:
     #return int(datetime.datetime.now().microsecond / 1000)
 
 
+class EpochAndDisambiguator(NamedTuple):
+    epoch: int
+    disambiguator: int
+
+
+def epoch_and_disambiguator_from_string(string: str) -> EpochAndDisambiguator:
+    return EpochAndDisambiguator(*tuple(int(s) for s in string.partition("_")[0::2]))
+
+
 def create_type_incompatible_error_message(
     operation: str,
     first_obj: Any,
     second_obj: Any
 ):
-    return "'{operation}' not supported between instances of '{first_type}' and '{second_type}'".format(
+    return "'{operation}' not supported between instances of '{first_type}' and '{second_type}'"\
+    .format(
         operation = operation,
         first_type = first_obj.__class__,
         second_type = second_obj.__class__
@@ -58,7 +68,7 @@ class ID(object, metaclass = IDClass):
         disambiguator: int | None = None
     ) -> None:
         if isinstance(epoch_or_str, str) and disambiguator is None:
-            raise Exception("NOT IMPLEMENTED")
+            self.epoch, self.disambiguator = epoch_and_disambiguator_from_string(epoch_or_str)
         elif isinstance(epoch_or_str, int) and isinstance(disambiguator, int):
             self.epoch = epoch_or_str
             self.disambiguator = disambiguator
@@ -104,7 +114,7 @@ class ID(object, metaclass = IDClass):
             other_disambiguator = other.disambiguator
         elif isinstance(other, str):
             try:
-                other_epoch, other_disambiguator = [int(s) for s in other.partition("_")[0::2]]
+                other_epoch, other_disambiguator = epoch_and_disambiguator_from_string(other)
             except ValueError:
                 # The string isn't even of the "int_int" variety.
                 raise TypeError("ID string needs to consist of two int-convertible strings separated by an underscore ('_'). 'other' is this instead: '{other}'".format(
