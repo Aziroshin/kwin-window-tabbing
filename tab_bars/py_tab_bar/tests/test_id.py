@@ -63,9 +63,6 @@ class TestIDOnSystemTime(unittest.TestCase):
     def test_lt_string(self):
         self.assertEqual(self.older_id < self.newer_id_string, True)
 
-    #def test_print_to_test_result(self):
-    #    raise Exception(self.newer_id.as_string())
-
 
 class TestIDOnFakeTimeWithoutDisambiguator(TestIDOnSystemTime):
     def setUp(self) -> None:
@@ -83,3 +80,11 @@ class TestIDOnFakeTimeWithDisambiguator(TestIDOnSystemTime):
         self.newer_id_string = "1728996943633_1"
 
 
+class TestIDWrongInitArgs(unittest.TestCase):
+    def test_str_and_int(self):
+        self.assertRaises(
+            TypeError,
+            ID, 
+            "String instead of epoch",
+            132
+        )
