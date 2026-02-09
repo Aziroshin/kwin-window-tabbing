@@ -1,5 +1,7 @@
 import dbg from "./dbg";
 import { ID } from "./id";
+import tab_bar from "./tab_bar";
+import dbus_packet_order_experiment from "./dbus_packet_order_experiment";
 
 
 type SignalCallbackType<S> = S extends Signal<infer C> ? C : never
@@ -408,7 +410,9 @@ var dbus_queue_polling_callback = function(): void {
     if (store.test_count % 10 == 0) {
         //dbg.debug(new Group().get_id())
         //dbg.log("dbus_queue_polling_callback called. Test count: " + store.test_count)
+        
     }
+    dbus_packet_order_experiment.dbus_packet_order_experiment.test("kwin-window-tabbing:" + new ID().as_string())
 }
 
 
@@ -440,9 +444,21 @@ var reset_dbus_queue_polling = function(): void {
 
 
 var test_timer_callback = function(): void {
-    store.test_count_2 += 1
-    if (store.test_count_2 % 1000 == 0) {
+    store.test_count += 1
+    if (store.test_count % 1000 == 0) {
         //dbg.debug("test_timer_callback called. Test count: " + store.test_count_2)
+    }
+    if (store.test_count == 1) {
+        let dbus_queue_polling_timer_a = new QTimer();
+        dbus_queue_polling_timer_a.interval = 0.1
+        dbus_queue_polling_timer_a.timeout.connect(dbus_queue_polling_callback)
+        dbus_queue_polling_timer_a.start()
+    }
+    if (store.test_count == 7) {
+        let dbus_queue_polling_timer_b = new QTimer();
+        dbus_queue_polling_timer_b.interval = 0.1
+        dbus_queue_polling_timer_b.timeout.connect(dbus_queue_polling_callback)
+        dbus_queue_polling_timer_b.start()
     }
 }
 
@@ -486,15 +502,19 @@ var main = function(): void {
         cycle_forward_action_callback
     );
     
-    let dbus_queue_polling_timer = new QTimer();
-    dbus_queue_polling_timer.interval = 2.0
+/*     let dbus_queue_polling_timer = new QTimer();
+    dbus_queue_polling_timer.interval = 1.0
     dbus_queue_polling_timer.timeout.connect(dbus_queue_polling_callback)
-    dbus_queue_polling_timer.start()
+    dbus_queue_polling_timer.start() */
     
     let test_timer = new QTimer();
-    test_timer.interval = 4.0
+    test_timer.interval = 500.0
     test_timer.timeout.connect(test_timer_callback)
     test_timer.start()
+
+    for (let i = 0; i < 20000; i++) {
+        dbus_queue_polling_callback()
+    }
 }
 
 
