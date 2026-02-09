@@ -10,8 +10,9 @@ from types import TracebackType
 from typing import Optional, Type
 
 # Imports: Third Party
-from PySide2.QtCore import QRect
-from PySide2.QtWidgets import QApplication, QTabWidget, QWidget
+from PySide6.QtCore import QRect
+from PySide6.QtWidgets import QApplication, QTabWidget, QWidget
+
 from dbus_fast.aio.message_bus import MessageBus
 from dbus_fast.service import ServiceInterface, method
 

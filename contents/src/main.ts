@@ -1,5 +1,7 @@
 import dbg from "./dbg";
 import { ID } from "./id";
+import tab_bar from "./tab_bar";
+import dbus_packet_order_experiment from "./dbus_packet_order_experiment";
 
 
 type SignalCallbackType<S> = S extends Signal<infer C> ? C : never
@@ -408,7 +410,9 @@ var dbus_queue_polling_callback = function(): void {
     if (store.test_count % 10 == 0) {
         //dbg.debug(new Group().get_id())
         //dbg.log("dbus_queue_polling_callback called. Test count: " + store.test_count)
+        
     }
+    dbus_packet_order_experiment.dbus_packet_order_experiment.test("1:" + new ID().as_string())
 }
 
 
@@ -487,7 +491,7 @@ var main = function(): void {
     );
     
     let dbus_queue_polling_timer = new QTimer();
-    dbus_queue_polling_timer.interval = 2.0
+    dbus_queue_polling_timer.interval = 0.1
     dbus_queue_polling_timer.timeout.connect(dbus_queue_polling_callback)
     dbus_queue_polling_timer.start()
     
