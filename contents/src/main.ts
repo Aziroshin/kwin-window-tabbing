@@ -1,7 +1,6 @@
 import dbg from "./dbg";
 import { ID } from "./id";
-import tab_bar from "./tab_bar";
-import dbus_packet_order_experiment from "./dbus_packet_order_experiment";
+import { Message, GroupPayload, WindowPayload, WindowsPayload, tab_bar_dbus } from "./tab_bar";
 
 
 type SignalCallbackType<S> = S extends Signal<infer C> ? C : never
@@ -29,10 +28,28 @@ type CallbackLockupWorkaroundTrackers<TCallbackNames extends string> = {
     }
 }
 
-
+/** Used to determine how to respond when the grouping toggle is used. */
 enum GroupingState {
     Disabled,
+    // NOTE: A configurable timeout on this mode might be a good idea;
+    // if the user selects a target, but then decides differently and
+    // forgets, and then wants to select a target much later, it'd be a
+    // problem if that window suddenly got grouped with the much earlier
+    // target instead.
+    // NOTE: A way to cancel this mode deliberatly should also be added.
+    /** We've already selected a window we want to put in a group (the
+     * "target") and are now in "select a window (the "tabbee") for the
+     * target window to get put into"-mode. Next time the grouping
+     * toggle is used the target is supposed to get added to the group of
+     * the tabbee.
+     *
+     * During normal use we probably won't spend much time in this mode,
+     * since the user is likely to select a "tabbee" right away.
+     * */
     SelectingTabbee,
+    /** We're in "normal" mode, waiting for a window (the "target") to be
+     * selected for grouping.
+     * */
     SelectingTarget
 }
 
@@ -214,11 +231,22 @@ class Group {
         this.awake = false
     }
 
+    /** Wakes the group if it has two or windows and makes it go dormant
+     * if it has one or none.
+     * */
     evaluate_wakeness(): void {
         if (!this.is_awake() && this.has_two_or_more_windows()) {
             this.wake_up()
         } else if (this.is_awake() && !this.has_two_or_more_windows()) {
             this.go_dormant()
+        }
+    }
+
+    as_payload(): GroupPayload {
+        return {
+            id: this.id,
+            windows: this.windows.as_payload(),
+            top_window: this.top_window?.as_payload()
         }
     }
 }
@@ -277,6 +305,13 @@ class WrappedWindow {
         target_window.group.add_window(this, true)
         this.group = target_window.group
     }
+    
+    as_payload(): WindowPayload {
+        return {
+            kwin_window_id: this.kwin_window.windowId,
+            group_id: this.group.get_id()
+        }
+    }
 }
 
 
@@ -327,6 +362,9 @@ class WrappedWindows {
         }
         return highest_window
     }
+    as_payload(): WindowsPayload {
+        return this.all.map((window: WrappedWindow) => window.as_payload())
+    }
 }
 
 
@@ -368,7 +406,11 @@ var grouping_action_callback = function(): void {
         store.tabbee.group_with(target)
         store.tabbee.kwin_window.frameGeometry = target.kwin_window.frameGeometry
         store.grouping_state = GroupingState.SelectingTabbee
-        
+
+        tab_bar_dbus.put_messages([
+            new Message("GROUP_DATA", store.tabbee.group.as_payload())
+        ])
+
         // TODO: Update group on the tab_bar service via DBus. Each update
         //   is to contain the group ID and a list of windows, whereas the 
         //   window objects in that list each contain a window ID, title and
@@ -378,6 +420,10 @@ var grouping_action_callback = function(): void {
         //   a rate - maybe these are different DBus messages, and if the group
         //   isn't recognizd on the other end, it just drops it? That could 
         //   potentially lead to desyncs, though.
+        //
+        //   This could be avoided by simply moving/resizing the tab bars in
+        //   the KWin script directly. If they're named distinctly and the name
+        //   contains the group ID that'd work.
         //
         //   Problem: Updates could still be sent out of order (?) and
         //   overwrite newer updates. Maybe there's no way around numbering
@@ -405,7 +451,7 @@ var cycle_backward_action_callback = function(): void {
 // BEGIN: DBus Queue Polling Functions
 //=========================================================================
 
-var dbus_queue_polling_callback = function(): void {
+/* var dbus_queue_polling_callback = function(): void {
     store.test_count += 1
     if (store.test_count % 10 == 0) {
         //dbg.debug(new Group().get_id())
@@ -413,10 +459,10 @@ var dbus_queue_polling_callback = function(): void {
         
     }
     dbus_packet_order_experiment.dbus_packet_order_experiment.test("kwin-window-tabbing:" + new ID().as_string())
-}
+} */
 
 
-var start_dbus_queue_polling = function(timer: QTimer): void {
+/* var start_dbus_queue_polling = function(timer: QTimer): void {
     timer.interval = 1.0
     timer.timeout.connect(dbus_queue_polling_callback)
     timer.start()
@@ -435,7 +481,7 @@ var set_up_dbus_queue_polling = function(): void {
 
 var reset_dbus_queue_polling = function(): void {
     store.callback_lockup_workaround_trackers.dbus_queue_polling_timer
-}
+} */
 
 
 //=========================================================================
@@ -443,7 +489,7 @@ var reset_dbus_queue_polling = function(): void {
 //=========================================================================
 
 
-var test_timer_callback = function(): void {
+/* var test_timer_callback = function(): void {
     store.test_count += 1
     if (store.test_count % 1000 == 0) {
         //dbg.debug("test_timer_callback called. Test count: " + store.test_count_2)
@@ -460,7 +506,7 @@ var test_timer_callback = function(): void {
         dbus_queue_polling_timer_b.timeout.connect(dbus_queue_polling_callback)
         dbus_queue_polling_timer_b.start()
     }
-}
+} */
 
 
 var main = function(): void {
@@ -507,14 +553,11 @@ var main = function(): void {
     dbus_queue_polling_timer.timeout.connect(dbus_queue_polling_callback)
     dbus_queue_polling_timer.start() */
     
-    let test_timer = new QTimer();
+/*     let test_timer = new QTimer();
     test_timer.interval = 500.0
     test_timer.timeout.connect(test_timer_callback)
-    test_timer.start()
+    test_timer.start() */
 
-    for (let i = 0; i < 20000; i++) {
-        dbus_queue_polling_callback()
-    }
 }
 
 

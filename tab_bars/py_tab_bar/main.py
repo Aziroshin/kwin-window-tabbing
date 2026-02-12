@@ -5,7 +5,9 @@
 
 
 # Imports: Python
+import asyncio
 import sys
+import json
 from types import TracebackType
 from typing import Optional, Type
 
@@ -24,6 +26,10 @@ from dbus_fast_types import s
 DEVFIXTURE_rect = QRect(300, 500, 200, 200)
 DEVFIXTURE_bar_offset = 50
 
+SERVICE_NAME = "com.aziroshin.KWinWindowTabbingTabBar"
+OBJECT_NAME = "/com/aziroshin/KWinWindowTabbingTabBar"
+INTERFACE_NAME = "com.aziroshin.KWinWindowTabbingTabBar.TabBar"
+DBUS_RETURN_STATUS_RECEIVED = "RECEIVED"
 
 class ContextManagedQTabWidget(QTabWidget):
     def __enter__(self) -> "ContextManagedQTabWidget":
@@ -123,23 +129,37 @@ class TabBarDBusInterface(ServiceInterface):
     def __init__(self, name: str):
         super().__init__(name)
 
-    # List of groups.
     @method()
-    def PutGroups(
-        self
-    ) -> "s":
-        return ""
+    def PutMessages(self, raw_messages: "s") -> "s":
+        print("running PutMessages. Received: " + raw_messages)
+        messages = json.loads(raw_messages)
+        print(messages)
+
+        return DBUS_RETURN_STATUS_RECEIVED
+
+
+async def main():
+    bus = await MessageBus().connect()
+    interface= TabBarDBusInterface(INTERFACE_NAME)
+    bus.export(OBJECT_NAME, interface)
+    await bus.request_name(SERVICE_NAME)
+
+    print("running main")
+
+    await bus.wait_for_disconnect()
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     groups = RecordCollection[Group]()
 
-    groups.append(Group("test", DEVFIXTURE_rect))
-    groups.append(Group("test2", DEVFIXTURE_rect))
-    groups["test"].on_window_received(Window("test_window_a", "Test Window A"))
-    groups["test"].on_window_received(Window("test_window_a_2", "Test Window A 2"))
-    groups["test2"].on_window_received(Window("test_window_b", "Test Window B"))
-    groups["test2"].on_window_received(Window("test_window_b_2", "Test Window B 2"))
+    #groups.append(Group("test", DEVFIXTURE_rect))
+    #groups.append(Group("test2", DEVFIXTURE_rect))
+    #groups["test"].on_window_received(Window("test_window_a", "Test Window A"))
+    #groups["test"].on_window_received(Window("test_window_a_2", "Test Window A 2"))
+    #groups["test2"].on_window_received(Window("test_window_b", "Test Window B"))
+    #groups["test2"].on_window_received(Window("test_window_b_2", "Test Window B 2"))
+
+    asyncio.run(main())
 
     sys.exit(app.exec_())

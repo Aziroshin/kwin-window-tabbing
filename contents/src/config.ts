@@ -30,8 +30,7 @@ var config = {
                     name: "TabBar",
                     methods: {
                         pop_commands_queued_for_kwin: "popCommandsQueuedForKwin",
-                        put_groups: "putGroups",
-                        test: "test"
+                        put_messages: "PutMessages",
                     }
                 }
             }
