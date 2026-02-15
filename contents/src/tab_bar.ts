@@ -73,8 +73,7 @@ export let tab_bar_dbus = {
         callDBus(
             dbus_config.service,
             dbus_config.object,
-            dbus_config.service
-                + '.' + dbus_config.interfaces.tab_bar.name,
+            dbus_config.interfaces.tab_bar.name,
             dbus_config.interfaces.tab_bar.methods.put_messages,
             JSON.stringify(messages),
             this._status_callback
