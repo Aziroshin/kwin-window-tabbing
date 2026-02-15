@@ -27,7 +27,7 @@ var config = {
             object: "/com/aziroshin/KWinWindowTabbingTabBar",
             interfaces: {
                 tab_bar: {
-                    name: "TabBar",
+                    name: "local.py.main.DBusService",
                     methods: {
                         pop_commands_queued_for_kwin: "popCommandsQueuedForKwin",
                         put_messages: "PutMessages",

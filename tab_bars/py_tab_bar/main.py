@@ -5,22 +5,21 @@
 
 
 # Imports: Python
-import asyncio
 import sys
 import json
 from types import TracebackType
 from typing import Optional, Type
+import traceback
 
 # Imports: Third Party
-from PySide6.QtCore import QRect
+from PySide6.QtCore import QRect, Slot, QObject, Signal, SignalInstance
 from PySide6.QtWidgets import QApplication, QTabWidget, QWidget
-
-from dbus_fast.aio.message_bus import MessageBus
-from dbus_fast.service import ServiceInterface, method
+from PySide6.QtDBus import QDBusConnection
+from PySide6 import QtAsyncio
+import PySide6.QtCore
 
 # Imports: Project
 from record import Record, RecordCollection
-from dbus_fast_types import s
 
 
 DEVFIXTURE_rect = QRect(300, 500, 200, 200)
@@ -120,46 +119,74 @@ class Group(Record):
         [self._windows.remove(window) for window in self._windows if window.id == window_id]
 
 
-# Misc notes:
-# - The name for the event responder function for a window getting grouped
-# should probably be `on_window_grouped`.
+# Makes it possible to __get_attr__ the instance of the type `signal_type` of
+# a `SignalInstance` object without incurring type errors.
+# e.g. if the signal was defined with `str` and you wanted to get that, you'd
+# pass `str` for `signal_type`.
+# Also, even though this is referring to `SignalType`, in practice you can
+# just pass a `Signal` object for `signal`.
+def signal_type_fix_get_str(signal: SignalInstance, signal_type: type) -> SignalInstance:
+    # We're suppressing the warning about __get_item__ not being implemented.
+    return signal[signal_type]  # pyright: ignore [reportUnknownVariableType, reportGeneralTypeIssues]
 
 
-class TabBarDBusInterface(ServiceInterface):
-    def __init__(self, name: str):
-        super().__init__(name)
+class DBusService(QObject):
+    message_put_signal = Signal(str)
 
-    @method()
-    def PutMessages(self, raw_messages: "s") -> "s":
-        print("running PutMessages. Received: " + raw_messages)
-        messages = json.loads(raw_messages)
-        print(messages)
+    def __init__(self, parent: PySide6.QtCore.QObject | None = None):
+        super().__init__(parent)  # pyright: ignore [reportGeneralTypeIssues]
+        signal_type_fix_get_str(self.message_put_signal, str).connect(self.on_messages_put)
+
+    @Slot(str, result=str)
+    def PutMessages(self, raw_messages: str) -> str:
+        self.message_put_signal.emit(raw_messages)
 
         return DBUS_RETURN_STATUS_RECEIVED
 
-
-async def main():
-    bus = await MessageBus().connect()
-    interface= TabBarDBusInterface(INTERFACE_NAME)
-    bus.export(OBJECT_NAME, interface)
-    await bus.request_name(SERVICE_NAME)
-
-    print("running main")
-
-    await bus.wait_for_disconnect()
+    @Slot(str)
+    def on_messages_put(self, messages: str):
+        # Barebones prototype to get enough info out of the message to
+        # spawn tabs.
+        try:
+            messages = json.loads(messages)
+        except json.decoder.JSONDecodeError:
+            print("ERROR: Non-JSON DBus message received for", "PutMessages", "method.", "What we got:", messages)
+            print("Below is the JSON error we got related to this:")
+            print(traceback.format_exc())
+        for message in messages:
+            if not "code" in message:
+                print("'code' not in message. Message:", message)
+                continue
+            if "code" in message and message["code"] == "GROUP_DATA":
+                if not "payload" in message:
+                    print("'payload' key not in 'GROUP_DATA' message. Message:", message)
+                    continue
+                if not "windows" in message["payload"]:
+                    print("'windows' key not in 'GROUP_DATA' payload. Message:", message)
+                    continue
+                for window in message["payload"]["windows"]:
+                    if not "group_id" in window:
+                        print("'group_id' not in window. Message:", message)
+                        continue
+                    if not "epoch" in window["group_id"]:
+                        print("'epoch' missing in 'group_id' of window. Message:", message)
+                        continue
+                    if not "disambiguator" in window["group_id"]:
+                        print("'disambiguator' missing in 'group_id' of window. Message:", message)
+                        continue
+                    group_id = str(window["group_id"]["epoch"]) + "_" + str(window["group_id"]["disambiguator"])
+                    groups.append(Group(group_id, DEVFIXTURE_rect))
+                    groups[group_id].on_window_received(Window("window_" + str(window["kwin_window_id"]), "Test Window " + str(window["kwin_window_id"])))
+        print(messages)
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     groups = RecordCollection[Group]()
 
-    #groups.append(Group("test", DEVFIXTURE_rect))
-    #groups.append(Group("test2", DEVFIXTURE_rect))
-    #groups["test"].on_window_received(Window("test_window_a", "Test Window A"))
-    #groups["test"].on_window_received(Window("test_window_a_2", "Test Window A 2"))
-    #groups["test2"].on_window_received(Window("test_window_b", "Test Window B"))
-    #groups["test2"].on_window_received(Window("test_window_b_2", "Test Window B 2"))
+    dbus = QDBusConnection.sessionBus()
+    dbus.registerService(SERVICE_NAME)
+    dbus_message_object = DBusService()
 
-    asyncio.run(main())
-
-    sys.exit(app.exec_())
+    dbus.registerObject(OBJECT_NAME, dbus_message_object, QDBusConnection.RegisterOption.ExportAllSlots)
+    QtAsyncio.run(handle_sigint=True)  # pyright: ignore [reportUnknownMemberType]

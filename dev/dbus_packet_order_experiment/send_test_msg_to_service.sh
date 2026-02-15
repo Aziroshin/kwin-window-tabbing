@@ -1,10 +1,3 @@
 #!/bin/bash
 
-
-while [ 1 ]; do
-    # gdbus version:
-    #gdbus call --session --dest com.aziroshin.KWinWindowTabbingDBusPacketOrderExperiment --object-path /com/aziroshin/KWinWindowTabbingDBusPacketOrderExperiment --method com.aziroshin.KWinWindowTabbingDBusPacketOrderExperiment.Test.Test "Message from send_test_msg_to_service.sh:$(date +%s)_512"
-    # qdbus version:
-    qdbus com.aziroshin.KWinWindowTabbingDBusPacketOrderExperiment /com/aziroshin/KWinWindowTabbingDBusPacketOrderExperiment com.aziroshin.KWinWindowTabbingDBusPacketOrderExperiment.Test.Test "Message from send_test_msg_to_service.sh:$(date +%s)_512"
-done
-
+qdbus com.aziroshin.KWinWindowTabbingTabBar /com/aziroshin/KWinWindowTabbingTabBar local.py.main.DBusService.PutMessages '[{"code":"GROUP_DATA","id":{"epoch":1771132388387,"disambiguator":0},"payload":{"id":{"epoch":1771132388386,"disambiguator":0},"windows":[{"kwin_window_id":31981577,"group_id":{"epoch":1771132388387,"disambiguator":0}},{"kwin_window_id":32243721,"group_id":{"epoch":1771132388387,"disambiguator":0}}],"top_window":{"kwin_window_id":32243721,"group_id":{"epoch":1771132388387,"disambiguator":0}}}},{"code":"GROUP_DATA","id":{"epoch":1771132388387,"disambiguator":1},"payload":{"id":{"epoch":1771132388386,"disambiguator":1},"windows":[{"kwin_window_id":31981578,"group_id":{"epoch":1771132388387,"disambiguator":1}},{"kwin_window_id":32243722,"group_id":{"epoch":1771132388387,"disambiguator":1}}],"top_window":{"kwin_window_id":32243721,"group_id":{"epoch":1771132388387,"disambiguator":1}}}}]'
