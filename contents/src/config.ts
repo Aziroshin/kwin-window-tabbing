@@ -5,6 +5,10 @@ var config = {
     print_using_console: false,
     // Use DBus for printing?
     print_using_dbus: true,
+
+    // Tab bar window captions start with this string. This is used to
+    // identify tab bar windows.
+    tab_bar_caption_identifier_prefix: "kwin-window-tabbing-tab-bar",
     
     // DBus services we're going to use using `callDBus`.
     dbus_services: {

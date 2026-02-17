@@ -1,3 +1,4 @@
+import config from "./config";
 import dbg from "./dbg";
 import { ID } from "./id";
 import { Message, GroupPayload, WindowPayload, WindowsPayload, tab_bar_dbus } from "./tab_bar";
@@ -55,9 +56,10 @@ enum GroupingState {
 
 
 class Store {
-    tabbee: WrappedWindow
+    tabbee: WrappedGroupableWindow
     grouping_state: GroupingState
-    windows: WrappedStoreWindows
+    groups: Map<string, Group>
+    windows: WrappedGroupableStoreWindows
     test_count: number
     test_count_2: number
     callback_lockup_workaround_trackers: CallbackLockupWorkaroundTrackers<
@@ -65,7 +67,8 @@ class Store {
     >
 
     constructor() {
-        this.windows = new WrappedStoreWindows()
+        this.groups = new Map<string, Group>
+        this.windows = new WrappedGroupableStoreWindows(this.groups)
         this.grouping_state = GroupingState.SelectingTabbee
         this.tabbee = this.windows.get_wrapped(workspace.activeClient)
         this.test_count = 0
@@ -93,17 +96,19 @@ class Store {
 class Group {
     private awake: boolean
     protected id: ID
-    protected windows: WrappedWindows
-    protected top_window: WrappedWindow | null
+    protected windows: WrappedGroupableWindows
+    protected top_window: WrappedGroupableWindow | null
+    protected tab_bar_window: WrappedWindow | null
     on_top_window_changed_resize_all_callback:
         | SignalCallbackType<KWin.Toplevel["clientGeometryChanged"]>
         | undefined
 
     constructor() {
         this.id = new ID()
-        this.windows = new WrappedWindows()
+        this.windows = new WrappedGroupableWindows()
         this.awake = false
         this.top_window = null
+        this.tab_bar_window = null
     }
 
     get_id(): ID {
@@ -118,7 +123,7 @@ class Group {
         return this.awake
     }
 
-    has_window(window: WrappedWindow | KWin.AbstractClient): boolean {
+    has_window(window: WrappedGroupableWindow | KWin.AbstractClient): boolean {
         return this.windows.has_window(window)
     }
 
@@ -136,7 +141,7 @@ class Group {
     // Another approach might be the windows managing themselves, connecting
     // and disconnecting the resize callback depending on whether they're
     // atop their group.
-    set_top_window(window: WrappedWindow | null): boolean {
+    set_top_window(window: WrappedGroupableWindow | null): boolean {
         if (window !== null && !this.windows.has_window(window)) {
             return false
         }
@@ -155,6 +160,12 @@ class Group {
                 this.windows.all.forEach((window_) => {
                     window_.kwin_window.frameGeometry = toplevel.frameGeometry
                 })
+                if (this.tab_bar_window) {
+                    // Making the geometry of the tab bar window the same as
+                    // its grouped windows for testing. Once it works, it'll
+                    // have to be sensibly placed and sized, of course.
+                    this.tab_bar_window.kwin_window.frameGeometry = toplevel.frameGeometry
+                }
             }
             window.kwin_window.clientGeometryChanged.connect(
                 this.on_top_window_changed_resize_all_callback
@@ -164,14 +175,18 @@ class Group {
         return true
     }
 
-    get_next_window_in_line_for_top(): WrappedWindow | null {
+    set_tab_bar_window(tab_bar_window: WrappedWindow) {
+        this.tab_bar_window = tab_bar_window
+    }
+
+    get_next_window_in_line_for_top(): WrappedGroupableWindow | null {
         if (this.is_empty()) {
             return null
         }
         return this.windows.all[0]
     }
 
-    get_top_window(): WrappedWindow | null {
+    get_top_window(): WrappedGroupableWindow | null {
         return this.top_window ? this.top_window : null
     }
 
@@ -183,7 +198,7 @@ class Group {
         this.set_top_window(this.windows.get_top_stack_window())
     }
 
-    add_window(window: WrappedWindow, request_top: boolean): boolean {
+    add_window(window: WrappedGroupableWindow, request_top: boolean): boolean {
         if (this.has_window(window)) {
             dbg.log(
                 "WARNING: Tried adding window to group it was already in: "
@@ -215,7 +230,7 @@ class Group {
         return true
     }
 
-    remove_window(window: WrappedWindow): void {
+    remove_window(window: WrappedGroupableWindow): void {
         this.windows.remove_window(window)
         this.ensure_correct_top_window()
         this.evaluate_wakeness()
@@ -252,34 +267,39 @@ class Group {
 }
 
 
+class WrappedWindow {
+    kwin_window: KWin.AbstractClient
+    constructor(
+        kwin_window: KWin.AbstractClient,
+    ) {
+        this.kwin_window = kwin_window
+    }
+}
+
+
 /** A wrapper for `KWin.AbstractClient`. Whenever possible, code
  * throughout the code base will use this, and when variable names contain
  * "window", that's what that refers to. Variables directly referring to
  * a `KWin.AbstractClient` object would contain `kwin_window` instead.
  * */
-class WrappedWindow {
-    kwin_window: KWin.AbstractClient
+class WrappedGroupableWindow extends WrappedWindow{
     group: Group
 
     private constructor(
         kwin_window: KWin.AbstractClient,
-        group: Group | null = null
+        group: Group
     ) {
-        this.kwin_window = kwin_window
-        if (group == null) {
-            this.group = new Group()
-            this.group.add_window(this, true)
-        } else {
-            // TODO: What if the window isn't a part of this group?
-            this.group = group
-        }
+        super(kwin_window)
+        // TODO: What if the window isn't a part of this group?
+        this.group = group
     }
 
     static new_or_get_wrapped_store_bound(
-        store_windows: WrappedStoreWindows,
+        store_windows: WrappedGroupableStoreWindows,
+        store_groups: Map<string, Group>,
         kwin_window: KWin.AbstractClient,
-        group: Group | null = null
-    ): WrappedWindow {
+        maybe_group: Group | null = null
+    ): WrappedGroupableWindow {
         let maybe_wrapped_window = store_windows.all.find((wrapped_window) => {
             return wrapped_window.kwin_window.windowId == kwin_window.windowId
         })
@@ -287,7 +307,22 @@ class WrappedWindow {
             return maybe_wrapped_window
         }
         
-        let new_wrapped = new WrappedWindow(kwin_window, group)
+        let group: Group
+        if (maybe_group == null) {
+            group = new Group()
+        } else {
+            group = maybe_group
+        }
+
+        let new_wrapped = new WrappedGroupableWindow(kwin_window, group)
+        if (maybe_group == null) {
+            group.add_window(new_wrapped, true)
+        }
+
+        if (!store_groups.has(group.get_id().as_string())) {
+            store_groups.set(group.get_id().as_string(), group)
+        }
+
         store_windows.all.push(new_wrapped)
         return new_wrapped
     }
@@ -300,7 +335,7 @@ class WrappedWindow {
     /** Move this window into the target window's group.
      * This is the principal method for grouping windows.
      * */
-    group_with(target_window: WrappedWindow): void {
+    group_with(target_window: WrappedGroupableWindow): void {
         this.group.remove_window(this)
         target_window.group.add_window(this, true)
         this.group = target_window.group
@@ -316,9 +351,9 @@ class WrappedWindow {
 }
 
 
-class WrappedWindows {
+class WrappedGroupableWindows {
     // TODO: Makes this class an iterable.
-    all: Array<WrappedWindow>
+    all: Array<WrappedGroupableWindow>
 
     constructor() {
         this.all = []
@@ -328,7 +363,7 @@ class WrappedWindows {
         return this.all.length > 0
     }
 
-    has_window(any_window: WrappedWindow | KWin.AbstractClient): boolean {
+    has_window(any_window: WrappedGroupableWindow | KWin.AbstractClient): boolean {
         let kwin_window = isKWinWindow(any_window) ? any_window : any_window.kwin_window
         
         return this.all.some((wrapped_window) => {
@@ -336,11 +371,11 @@ class WrappedWindows {
         })
     }
 
-    add_window(window: WrappedWindow): void {
+    add_window(window: WrappedGroupableWindow): void {
         this.all.push(window)
     }
 
-    remove_window(window_to_remove: WrappedWindow): void {
+    remove_window(window_to_remove: WrappedGroupableWindow): void {
         let index = this.all.findIndex((prospective_window) => {
             return prospective_window == window_to_remove
         })
@@ -350,8 +385,8 @@ class WrappedWindows {
     }
 
     /** Get the window at the top of the stacking order. */
-    get_top_stack_window(): WrappedWindow | null {
-        let highest_window: WrappedWindow | null = null
+    get_top_stack_window(): WrappedGroupableWindow | null {
+        let highest_window: WrappedGroupableWindow | null = null
         for (let window of this.all) {
             if (highest_window == null) {
                 highest_window = window
@@ -364,28 +399,39 @@ class WrappedWindows {
         return highest_window
     }
     as_payload(): WindowsPayload {
-        return this.all.map((window: WrappedWindow) => window.as_payload())
+        return this.all.map((window: WrappedGroupableWindow) => window.as_payload())
     }
 }
 
 
-class WrappedStoreWindows extends WrappedWindows {
+class WrappedGroupableStoreWindows extends WrappedGroupableWindows {
+    store_groups: Map<string, Group>
+    
+    constructor (store_groups: Map<string, Group>) {
+        super()
+        this.store_groups = store_groups
+    }
+
     /** Get an existing handler corresponding to `window` or get a new one.
-     * This is the principal method for getting a `WrappedWindow`.
+     * This is the principal method for getting a `WrappedGroupableWindow`.
      * */
-    get_wrapped(kwin_window: KWin.AbstractClient): WrappedWindow {
-        let new_wrapped = WrappedWindow.new_or_get_wrapped_store_bound(this, kwin_window)
+    get_wrapped(kwin_window: KWin.AbstractClient): WrappedGroupableWindow {
+        let new_wrapped = WrappedGroupableWindow.new_or_get_wrapped_store_bound(
+            this,
+            this.store_groups,
+            kwin_window,
+        )
         return new_wrapped
     }
 }
 
 
-var isKWinWindow = (item: WrappedWindow | KWin.AbstractClient): item is KWin.AbstractClient => {
+var isKWinWindow = (item: WrappedGroupableWindow | KWin.AbstractClient): item is KWin.AbstractClient => {
     return "fullScreenable" in item
 }
 
 
-var isWrappedWindow = (item: WrappedWindow | KWin.AbstractClient): item is WrappedWindow => {
+var isWrappedWindow = (item: WrappedGroupableWindow | KWin.AbstractClient): item is WrappedGroupableWindow => {
     return !isKWinWindow(item)
 }
 
@@ -548,6 +594,33 @@ var main = function(): void {
         'Meta+Alt+C',
         cycle_forward_action_callback
     );
+    workspace.clientAdded.connect((kwin_window: KWin.AbstractClient) => {
+        kwin_window.captionChanged.connect(() => {
+            let caption = kwin_window.caption
+            if (!(caption.startsWith(config.tab_bar_caption_identifier_prefix))) {
+                return
+            }
+
+            let caption_elements = caption.split(":")[1]
+            if (caption_elements.length < 2) {
+                dbg.debug("Malformed window caption for tab bar window found. KWin-Window ID: " + kwin_window.windowId)
+                return
+            }
+            // An awkward way of using the sanity checks of `new_from_string`.
+            let group_id = ID.new_from_string(caption_elements[1])?.as_string()
+            if (group_id == null) {
+                dbg.debug("Malformed group ID in tab bar window caption found. KWin-Window ID: " + kwin_window.windowId)
+                return
+            }
+            if (!store.groups.has(group_id)) {
+                dbg.debug("Group ID in tab bar window caption for group that doesn't exist. KWin-Window ID: "
+                    + kwin_window.windowId + ", group ID: "+ group_id
+                )
+                return
+            }
+            store.groups.get(group_id)?.set_tab_bar_window(new WrappedWindow(kwin_window))
+        })
+    })
     
 /*     let dbus_queue_polling_timer = new QTimer();
     dbus_queue_polling_timer.interval = 1.0

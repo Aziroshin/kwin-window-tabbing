@@ -52,8 +52,11 @@ class Bar:
     def __init__(self, group: "Group") -> None:
         self.group = group
         self._widget = ContextManagedQTabWidget()
-        self.resize(int(self.group.rect.width() - DEVFIXTURE_bar_offset * 2), 1)
-        self.move(group.rect.x() + DEVFIXTURE_bar_offset, group.rect.y())
+        self._widget.setWindowTitle("kwin-window-tabbing-tab-bar:{group_id}".format(
+            group_id = group.id
+        ))
+        #self.resize(int(self.group.rect.width() - DEVFIXTURE_bar_offset * 2), 1)
+        #self.move(group.rect.x() + DEVFIXTURE_bar_offset, group.rect.y())
 
     def show(self) -> None:
         self._widget.show()
