@@ -12,6 +12,7 @@ let dbus_config = config.dbus_services.tab_bar
 export type WindowPayload = {
     kwin_window_id: number
     group_id: ID
+    caption: string
 }
 
 export type WindowsPayload = WindowPayload[]

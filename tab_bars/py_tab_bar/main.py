@@ -64,7 +64,7 @@ class Bar:
     def add_tab_for_window(self, window: "Window") -> None:
         dummy = QWidget()
         with self._widget as widget:
-            widget.addTab(dummy, window.title)
+            widget.addTab(dummy, window.caption)
 
     def resize(self, width: int, height: int) -> None:
         with self._widget as widget:
@@ -78,11 +78,11 @@ class Bar:
 
 
 class Window(Record):
-    title: str
+    caption: str
 
-    def __init__(self, id: str, title: str) -> None:
+    def __init__(self, id: str, caption: str) -> None:
         super().__init__(id)
-        self.title = title
+        self.caption = caption
 
 
 class Group(Record):
@@ -176,7 +176,7 @@ class DBusService(QObject):
                         continue
                     group_id = str(window["group_id"]["epoch"]) + "_" + str(window["group_id"]["disambiguator"])
                     groups.append(Group(group_id, DEVFIXTURE_rect))
-                    groups[group_id].on_window_received(Window(str(window["kwin_window_id"]), "Test Window " + str(window["kwin_window_id"])))
+                    groups[group_id].on_window_received(Window(str(window["kwin_window_id"]), str(window["caption"])))
         print(messages)
 
 

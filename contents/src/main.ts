@@ -309,7 +309,8 @@ class WrappedWindow {
     as_payload(): WindowPayload {
         return {
             kwin_window_id: this.kwin_window.windowId,
-            group_id: this.group.get_id()
+            group_id: this.group.get_id(),
+            caption: this.kwin_window.caption
         }
     }
 }
