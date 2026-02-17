@@ -176,7 +176,7 @@ class DBusService(QObject):
                         continue
                     group_id = str(window["group_id"]["epoch"]) + "_" + str(window["group_id"]["disambiguator"])
                     groups.append(Group(group_id, DEVFIXTURE_rect))
-                    groups[group_id].on_window_received(Window("window_" + str(window["kwin_window_id"]), "Test Window " + str(window["kwin_window_id"])))
+                    groups[group_id].on_window_received(Window(str(window["kwin_window_id"]), "Test Window " + str(window["kwin_window_id"])))
         print(messages)
 
 
