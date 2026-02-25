@@ -156,27 +156,51 @@ class Group {
             this.top_window = null
         } else if (this.has_two_or_more_windows()) {
             this.top_window = window
+
+            //let tab_bar_window = this.tab_bar_window
+            //let windows = this.windows
             this.on_top_window_changed_resize_all_callback = (toplevel): void => {
                 this.windows.all.forEach((window_) => {
                     window_.kwin_window.frameGeometry = toplevel.frameGeometry
                 })
-                if (this.tab_bar_window) {
+
+                // This assignment is due to some weird issue where `this.tab_bar_window`
+                // suddenly turns `undefined` after the if-check, but only within the block.
+                // Tried a version where the callback is explicitly bound to `this`, which
+                // worked - but binding issues shouldn't cause this if-block isolated issue.
+                // It's also not related to access - accessing the variable more than once
+                // before entering the if-block doesn't change anything.
+                // TODO: Figure out why that happens and refactor the function accordingly.
+                let tab_bar_window = this.tab_bar_window
+                if (tab_bar_window) {
+                    // Here, `this.tab_bar_window` is `undefined` - despite not being so
+                    // during the if-check as well as the whole surrounding context before
+                    // and after the if-block.
+                    // dbg.log("tab_bar in block: " + this.tab_bar_window)
+                    
+                    if(tab_bar_window) {
+                    }
                     // Making the geometry of the tab bar window the same as
                     // its grouped windows for testing. Once it works, it'll
                     // have to be sensibly placed and sized, of course.
-                    this.tab_bar_window.kwin_window.frameGeometry = toplevel.frameGeometry
+                    tab_bar_window.kwin_window.frameGeometry = toplevel.frameGeometry
                 }
             }
             window.kwin_window.clientGeometryChanged.connect(
                 this.on_top_window_changed_resize_all_callback
             )
-
         }
+
         return true
     }
 
     set_tab_bar_window(tab_bar_window: WrappedWindow) {
         this.tab_bar_window = tab_bar_window
+        dbg.log("tab_bar_window right after setting: " + this.tab_bar_window)
+    }
+
+    get_tab_bar_window(): WrappedWindow | null {
+        return this.tab_bar_window
     }
 
     get_next_window_in_line_for_top(): WrappedGroupableWindow | null {
@@ -458,6 +482,8 @@ var grouping_action_callback = function(): void {
             new Message("GROUP_DATA", store.tabbee.group.as_payload())
         ])
 
+        dbg.log("tab bar window from grouping action callback group ID: " + store.groups.get(store.tabbee.group.get_id().as_string()))
+
         // TODO: Update group on the tab_bar service via DBus. Each update
         //   is to contain the group ID and a list of windows, whereas the 
         //   window objects in that list each contain a window ID, title and
@@ -595,31 +621,30 @@ var main = function(): void {
         cycle_forward_action_callback
     );
     workspace.clientAdded.connect((kwin_window: KWin.AbstractClient) => {
-        kwin_window.captionChanged.connect(() => {
-            let caption = kwin_window.caption
-            if (!(caption.startsWith(config.tab_bar_caption_identifier_prefix))) {
-                return
-            }
+        let caption = kwin_window.caption
+        if (!(caption.startsWith(config.tab_bar_caption_identifier_prefix))) {
+            return
+        }
 
-            let caption_elements = caption.split(":")[1]
-            if (caption_elements.length < 2) {
-                dbg.debug("Malformed window caption for tab bar window found. KWin-Window ID: " + kwin_window.windowId)
-                return
-            }
-            // An awkward way of using the sanity checks of `new_from_string`.
-            let group_id = ID.new_from_string(caption_elements[1])?.as_string()
-            if (group_id == null) {
-                dbg.debug("Malformed group ID in tab bar window caption found. KWin-Window ID: " + kwin_window.windowId)
-                return
-            }
-            if (!store.groups.has(group_id)) {
-                dbg.debug("Group ID in tab bar window caption for group that doesn't exist. KWin-Window ID: "
-                    + kwin_window.windowId + ", group ID: "+ group_id
-                )
-                return
-            }
-            store.groups.get(group_id)?.set_tab_bar_window(new WrappedWindow(kwin_window))
-        })
+        let caption_elements = caption.split(":")
+        if (caption_elements.length < 2) {
+            dbg.debug("Malformed window caption for tab bar window found. KWin-Window ID: " + kwin_window.windowId)
+            return
+        }
+        // An awkward way of using the sanity checks of `new_from_string`.
+        let group_id = ID.new_from_string(caption_elements[1])?.as_string()
+        if (group_id == null) {
+            dbg.debug("Malformed group ID in tab bar window caption found. KWin-Window ID: " + kwin_window.windowId)
+            return
+        }
+        if (!store.groups.has(group_id)) {
+            dbg.debug("Group ID in tab bar window caption for group that doesn't exist. KWin-Window ID: "
+                + kwin_window.windowId + ", group ID: "+ group_id
+            )
+            return
+        }
+        dbg.log("group_id: " + group_id + ", group: " + store.groups.get(group_id))
+        store.groups.get(group_id)?.set_tab_bar_window(new WrappedWindow(kwin_window))
     })
     
 /*     let dbus_queue_polling_timer = new QTimer();
