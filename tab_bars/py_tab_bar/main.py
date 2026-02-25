@@ -22,7 +22,7 @@ import PySide6.QtCore
 from record import Record, RecordCollection
 
 
-DEVFIXTURE_rect = QRect(300, 500, 200, 200)
+DEVFIXTURE_rect = QRect(300, 500, 200, 22)
 DEVFIXTURE_bar_offset = 50
 
 SERVICE_NAME = "com.aziroshin.KWinWindowTabbingTabBar"
@@ -55,6 +55,7 @@ class Bar:
         self._widget.setWindowTitle("kwin-window-tabbing-tab-bar:{group_id}".format(
             group_id = group.id
         ))
+        self.rect = group.rect
         #self.resize(int(self.group.rect.width() - DEVFIXTURE_bar_offset * 2), 1)
         #self.move(group.rect.x() + DEVFIXTURE_bar_offset, group.rect.y())
 
@@ -77,6 +78,16 @@ class Bar:
         with self._widget as widget:
             widget.move(x, y)
 
+    @property
+    def rect(self) -> QRect:
+        with self._widget as widget:
+            return widget.rect()
+
+    @rect.setter
+    def rect(self, rect: QRect):
+        with self._widget as widget:
+            widget.setGeometry(rect)
+
     #def remove_tab(self, )
 
 
@@ -90,12 +101,14 @@ class Window(Record):
 
 class Group(Record):
     bar: Optional[Bar]
-    rect: QRect
+    _rect: QRect
     _windows: RecordCollection[Window]
 
     def __init__(self, id: str, rect: QRect) -> None:
         super().__init__(id)
+        self.bar = None
         self.rect = rect
+        print("Group init, rect: ", self.rect)
         self._windows = RecordCollection[Window]()
 
     def on_rect_changed(self, changed_rect: QRect) -> None:
@@ -120,6 +133,17 @@ class Group(Record):
             
     def _remove_window_by_id(self, window_id: str) -> None:
         [self._windows.remove(window) for window in self._windows if window.id == window_id]
+
+    @property
+    def rect(self) -> QRect:
+        return self._rect
+
+    @rect.setter
+    def rect(self, rect: QRect):
+        print("rect setter called")
+        self._rect = rect
+        if self.bar:
+            self.bar.rect = rect
 
 
 # Makes it possible to __get_attr__ the instance of the type `signal_type` of

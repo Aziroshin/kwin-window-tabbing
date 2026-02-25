@@ -177,13 +177,16 @@ class Group {
                     // during the if-check as well as the whole surrounding context before
                     // and after the if-block.
                     // dbg.log("tab_bar in block: " + this.tab_bar_window)
-                    
                     if(tab_bar_window) {
                     }
-                    // Making the geometry of the tab bar window the same as
-                    // its grouped windows for testing. Once it works, it'll
-                    // have to be sensibly placed and sized, of course.
-                    tab_bar_window.kwin_window.frameGeometry = toplevel.frameGeometry
+                    tab_bar_window.kwin_window.frameGeometry = {
+                        x: toplevel.frameGeometry.x,
+                        y: toplevel.frameGeometry.y - tab_bar_window.kwin_window.frameGeometry.height,
+                        width: toplevel.frameGeometry.width,
+                        // Spread syntax results in `Unexpected token `='` at
+                        // runtime, so we do this (for now?).
+                        height: tab_bar_window.kwin_window.frameGeometry.height
+                    }
                 }
             }
             window.kwin_window.clientGeometryChanged.connect(
