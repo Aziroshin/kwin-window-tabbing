@@ -173,12 +173,6 @@ class Group {
                 // TODO: Figure out why that happens and refactor the function accordingly.
                 let tab_bar_window = this.tab_bar_window
                 if (tab_bar_window) {
-                    // Here, `this.tab_bar_window` is `undefined` - despite not being so
-                    // during the if-check as well as the whole surrounding context before
-                    // and after the if-block.
-                    // dbg.log("tab_bar in block: " + this.tab_bar_window)
-                    if(tab_bar_window) {
-                    }
                     tab_bar_window.kwin_window.frameGeometry = {
                         x: toplevel.frameGeometry.x,
                         y: toplevel.frameGeometry.y - tab_bar_window.kwin_window.frameGeometry.height,
@@ -199,7 +193,6 @@ class Group {
 
     set_tab_bar_window(tab_bar_window: WrappedWindow) {
         this.tab_bar_window = tab_bar_window
-        dbg.log("tab_bar_window right after setting: " + this.tab_bar_window)
     }
 
     get_tab_bar_window(): WrappedWindow | null {
@@ -485,8 +478,6 @@ var grouping_action_callback = function(): void {
             new Message("GROUP_DATA", store.tabbee.group.as_payload())
         ])
 
-        dbg.log("tab bar window from grouping action callback group ID: " + store.groups.get(store.tabbee.group.get_id().as_string()))
-
         // TODO: Update group on the tab_bar service via DBus. Each update
         //   is to contain the group ID and a list of windows, whereas the 
         //   window objects in that list each contain a window ID, title and
@@ -646,7 +637,6 @@ var main = function(): void {
             )
             return
         }
-        dbg.log("group_id: " + group_id + ", group: " + store.groups.get(group_id))
         store.groups.get(group_id)?.set_tab_bar_window(new WrappedWindow(kwin_window))
     })
     
