@@ -101,7 +101,7 @@ class Group {
     protected top_window: WrappedGroupableWindow | null
     protected tab_bar_window: WrappedTabBarWindow | null
     on_top_window_changed_resize_all_callback:
-        | SignalCallbackType<KWin.Toplevel["clientGeometryChanged"]>
+        | SignalCallbackType<KWin.Toplevel["bufferGeometryChanged"]>
         | undefined
     on_top_window_decoration_changed_callback:
         | SignalCallbackType<KWin.AbstractClient["decorationChanged"]>
@@ -167,7 +167,7 @@ class Group {
         }
 
         if (this.top_window && this.on_top_window_changed_resize_all_callback) {
-            this.top_window.kwin_window.clientGeometryChanged.disconnect(
+            this.top_window.kwin_window.bufferGeometryChanged.disconnect(
                 this.on_top_window_changed_resize_all_callback
             )
         }
@@ -201,7 +201,7 @@ class Group {
             // Even though it's an arrow function we bind here, as it somehow solves the
             // issue with `this` being `undefined` in the if-block.
             }) as NonNullable<typeof this.on_top_window_changed_resize_all_callback>).bind(this)
-            window.kwin_window.clientGeometryChanged.connect(
+            window.kwin_window.bufferGeometryChanged.connect(
                 this.on_top_window_changed_resize_all_callback
             )
 
