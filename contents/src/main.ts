@@ -163,23 +163,25 @@ class Group {
         } else if (this.has_two_or_more_windows()) {
             this.top_window = window
 
-            this.on_top_window_changed_resize_all_callback = (toplevel) => {
+            this.on_top_window_changed_resize_all_callback = (((toplevel) => {
                 this.set_all_windows_to_geometry(toplevel.frameGeometry)
 
-                // This assignment is due to some weird issue where `this.tab_bar_window`
-                // suddenly turns `undefined` after the if-check, but only within the block.
-                // Tried a version where the callback is explicitly bound to `this`, which
-                // worked - but binding issues shouldn't cause this if-block isolated issue.
-                // It's also not related to access - accessing the variable more than once
-                // before entering the if-block doesn't change anything.
-                // TODO: Figure out why that happens and refactor the function accordingly.
-                let tab_bar_window = this.tab_bar_window
-                if (tab_bar_window) {
-                    tab_bar_window.align_geometry_with_group_by_group_rect(
+                // There is some weird issue where `this.tab_bar_window`
+                // suddenly turns `undefined` after the if-check, but only
+                // within the block.
+                // It's also not related to access - accessing the variable
+                // more than once before entering the if-block doesn't change
+                // anything. Ternary expressions or closures (if nested in the
+                // function) aren't affected either.
+                // TODO: Figure out why that happens.
+                if (this.tab_bar_window) {
+                    this.tab_bar_window.align_geometry_with_group_by_group_rect(
                         toplevel.frameGeometry
                     )
                 }
-            }
+            // Even though it's an arrow function we bind here, as it somehow solves the
+            // issue with `this` being `undefined` in the if-block.
+            }) as NonNullable<typeof this.on_top_window_changed_resize_all_callback>).bind(this)
             window.kwin_window.clientGeometryChanged.connect(
                 this.on_top_window_changed_resize_all_callback
             )
