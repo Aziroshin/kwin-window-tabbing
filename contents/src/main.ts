@@ -106,6 +106,9 @@ class Group {
     on_top_window_decoration_changed_callback:
         | SignalCallbackType<KWin.AbstractClient["decorationChanged"]>
         | undefined
+    on_top_window_desktop_changed_callback:
+        | SignalCallbackType<KWin.AbstractClient["desktopChanged"]>
+        | undefined
 
     constructor() {
         this.id = new ID()
@@ -136,11 +139,20 @@ class Group {
             window_.kwin_window.frameGeometry = rect
         })
     }
+
+    set_desktop_of_all_windows(desktop: number) {
+        this.windows.all.forEach((window_) => {
+            dbg.log("current desktops: " + window_.kwin_window.desktop + ", new desktops: " + desktop)
+            window_.kwin_window.desktop = desktop
+        })
+    }
+
     enable_decoration() {
         this.windows.all.forEach((window_) => {
             window_.kwin_window.noBorder = false
         })
     }
+
     disable_decoration() {
         this.windows.all.forEach((window_) => {
             window_.kwin_window.noBorder = true
@@ -174,6 +186,11 @@ class Group {
         if (this.top_window && this.on_top_window_decoration_changed_callback) {
             this.top_window.kwin_window.decorationChanged.disconnect(
                 this.on_top_window_decoration_changed_callback
+            )
+        }
+        if (this.top_window && this.on_top_window_desktop_changed_callback) {
+            this.top_window.kwin_window.desktopChanged.disconnect(
+                this.on_top_window_desktop_changed_callback
             )
         }
 
@@ -214,6 +231,16 @@ class Group {
             }) as NonNullable<typeof this.on_top_window_decoration_changed_callback>).bind(this)
             window.kwin_window.decorationChanged.connect(
                 this.on_top_window_decoration_changed_callback
+            )
+
+            this.on_top_window_desktop_changed_callback = ((() => {
+                this.set_desktop_of_all_windows(window.kwin_window.desktop)
+                if (this.tab_bar_window) {
+                    this.tab_bar_window.kwin_window.desktop = window.kwin_window.desktop
+                }
+            }) as NonNullable<typeof this.on_top_window_desktop_changed_callback>).bind(this)
+            window.kwin_window.desktopChanged.connect(
+                this.on_top_window_desktop_changed_callback
             )
         }
 
