@@ -103,6 +103,9 @@ class Group {
     on_top_window_changed_resize_all_callback:
         | SignalCallbackType<KWin.Toplevel["clientGeometryChanged"]>
         | undefined
+    on_top_window_decoration_changed_callback:
+        | SignalCallbackType<KWin.AbstractClient["decorationChanged"]>
+        | undefined
 
     constructor() {
         this.id = new ID()
@@ -133,6 +136,17 @@ class Group {
             window_.kwin_window.frameGeometry = rect
         })
     }
+    enable_decoration() {
+        this.windows.all.forEach((window_) => {
+            window_.kwin_window.noBorder = false
+        })
+    }
+    disable_decoration() {
+        this.windows.all.forEach((window_) => {
+            window_.kwin_window.noBorder = true
+        })
+    }
+
     // TODO: Rework the whole top window thing to depend on the window
     // returned by `this.get_top_window()`, which should return the
     // window with the highest stackingOrder. The callback management
@@ -155,6 +169,11 @@ class Group {
         if (this.top_window && this.on_top_window_changed_resize_all_callback) {
             this.top_window.kwin_window.clientGeometryChanged.disconnect(
                 this.on_top_window_changed_resize_all_callback
+            )
+        }
+        if (this.top_window && this.on_top_window_decoration_changed_callback) {
+            this.top_window.kwin_window.decorationChanged.disconnect(
+                this.on_top_window_decoration_changed_callback
             )
         }
 
@@ -184,6 +203,17 @@ class Group {
             }) as NonNullable<typeof this.on_top_window_changed_resize_all_callback>).bind(this)
             window.kwin_window.clientGeometryChanged.connect(
                 this.on_top_window_changed_resize_all_callback
+            )
+
+            this.on_top_window_decoration_changed_callback = ((() => {
+                if (window.kwin_window.noBorder) {
+                    this.disable_decoration()
+                } else {
+                    this.enable_decoration()
+                }
+            }) as NonNullable<typeof this.on_top_window_decoration_changed_callback>).bind(this)
+            window.kwin_window.decorationChanged.connect(
+                this.on_top_window_decoration_changed_callback
             )
         }
 
