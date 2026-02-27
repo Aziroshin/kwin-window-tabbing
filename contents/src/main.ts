@@ -79,6 +79,7 @@ class Store {
     }
 }
 
+
 // The current design for groups is that they're immediately associated with
 // a window the moment the script creates a handler for it. This is a mixed
 // bag: 
@@ -98,7 +99,7 @@ class Group {
     protected id: ID
     protected windows: WrappedGroupableWindows
     protected top_window: WrappedGroupableWindow | null
-    protected tab_bar_window: WrappedWindow | null
+    protected tab_bar_window: WrappedTabBarWindow | null
     on_top_window_changed_resize_all_callback:
         | SignalCallbackType<KWin.Toplevel["clientGeometryChanged"]>
         | undefined
@@ -127,6 +128,11 @@ class Group {
         return this.windows.has_window(window)
     }
 
+    set_all_windows_to_geometry(rect: QRect) {
+        this.windows.all.forEach((window_) => {
+            window_.kwin_window.frameGeometry = rect
+        })
+    }
     // TODO: Rework the whole top window thing to depend on the window
     // returned by `this.get_top_window()`, which should return the
     // window with the highest stackingOrder. The callback management
@@ -157,12 +163,8 @@ class Group {
         } else if (this.has_two_or_more_windows()) {
             this.top_window = window
 
-            //let tab_bar_window = this.tab_bar_window
-            //let windows = this.windows
-            this.on_top_window_changed_resize_all_callback = (toplevel): void => {
-                this.windows.all.forEach((window_) => {
-                    window_.kwin_window.frameGeometry = toplevel.frameGeometry
-                })
+            this.on_top_window_changed_resize_all_callback = (toplevel) => {
+                this.set_all_windows_to_geometry(toplevel.frameGeometry)
 
                 // This assignment is due to some weird issue where `this.tab_bar_window`
                 // suddenly turns `undefined` after the if-check, but only within the block.
@@ -173,14 +175,9 @@ class Group {
                 // TODO: Figure out why that happens and refactor the function accordingly.
                 let tab_bar_window = this.tab_bar_window
                 if (tab_bar_window) {
-                    tab_bar_window.kwin_window.frameGeometry = {
-                        x: toplevel.frameGeometry.x,
-                        y: toplevel.frameGeometry.y - tab_bar_window.kwin_window.frameGeometry.height,
-                        width: toplevel.frameGeometry.width,
-                        // Spread syntax results in `Unexpected token `='` at
-                        // runtime, so we do this (for now?).
-                        height: tab_bar_window.kwin_window.frameGeometry.height
-                    }
+                    tab_bar_window.align_geometry_with_group_by_group_rect(
+                        toplevel.frameGeometry
+                    )
                 }
             }
             window.kwin_window.clientGeometryChanged.connect(
@@ -191,11 +188,11 @@ class Group {
         return true
     }
 
-    set_tab_bar_window(tab_bar_window: WrappedWindow) {
+    set_tab_bar_window(tab_bar_window: WrappedTabBarWindow) {
         this.tab_bar_window = tab_bar_window
     }
 
-    get_tab_bar_window(): WrappedWindow | null {
+    get_tab_bar_window(): WrappedTabBarWindow | null {
         return this.tab_bar_window
     }
 
@@ -418,6 +415,7 @@ class WrappedGroupableWindows {
         }
         return highest_window
     }
+
     as_payload(): WindowsPayload {
         return this.all.map((window: WrappedGroupableWindow) => window.as_payload())
     }
@@ -442,6 +440,23 @@ class WrappedGroupableStoreWindows extends WrappedGroupableWindows {
             kwin_window,
         )
         return new_wrapped
+    }
+}
+
+
+class WrappedTabBarWindow extends WrappedWindow {
+    /** Moves and sizes the window to assume its intended position as a
+     * tab bar for a set of tabbed windows.
+     */
+    align_geometry_with_group_by_group_rect(group_rect: QRect) {
+        this.kwin_window.frameGeometry = {
+            x: group_rect.x,
+            y: group_rect.y - this.kwin_window.frameGeometry.height,
+            width: group_rect.width,
+            // Spread syntax results in `Unexpected token `='` at
+            // runtime, so we do this (for now?).
+            height: this.kwin_window.frameGeometry.height
+        }
     }
 }
 
@@ -637,7 +652,7 @@ var main = function(): void {
             )
             return
         }
-        store.groups.get(group_id)?.set_tab_bar_window(new WrappedWindow(kwin_window))
+        store.groups.get(group_id)?.set_tab_bar_window(new WrappedTabBarWindow(kwin_window))
     })
     
 /*     let dbus_queue_polling_timer = new QTimer();
