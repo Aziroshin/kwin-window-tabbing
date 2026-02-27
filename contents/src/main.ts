@@ -222,6 +222,11 @@ class Group {
 
     set_tab_bar_window(tab_bar_window: WrappedTabBarWindow) {
         this.tab_bar_window = tab_bar_window
+        if (this.top_window) {
+            this.tab_bar_window.align_geometry_with_group_by_group_rect(
+                this.top_window.kwin_window.frameGeometry
+            )
+        }
     }
 
     get_tab_bar_window(): WrappedTabBarWindow | null {
