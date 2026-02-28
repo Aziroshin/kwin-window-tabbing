@@ -499,12 +499,16 @@ class WrappedTabBarWindow extends WrappedWindow {
 }
 
 
-var isKWinWindow = (item: WrappedGroupableWindow | KWin.AbstractClient): item is KWin.AbstractClient => {
+var isKWinWindow = (
+    item: | Exclude<WrappedWindow, {fullScreenable: boolean}> | KWin.AbstractClient
+): item is KWin.AbstractClient => {
     return "fullScreenable" in item
 }
 
 
-var isWrappedWindow = (item: WrappedGroupableWindow | KWin.AbstractClient): item is WrappedGroupableWindow => {
+var isWrappedWindow = (
+    item: | Exclude<WrappedWindow, {fullScreenable: boolean}> | KWin.AbstractClient
+): item is Exclude<WrappedWindow, {fullScreenable: boolean}> => {
     return !isKWinWindow(item)
 }
 
