@@ -1,7 +1,8 @@
 import config from "./config";
 import dbg from "./dbg";
 import { ID } from "./id";
-import { Message, GroupPayload, WindowPayload, WindowsPayload, tab_bar_dbus } from "./tab_bar";
+import { Message, GroupPayload, WindowPayload, WindowsPayload } from "./tab_bar";
+import * as tab_bar from "./tab_bar";
 
 
 type SignalCallbackType<S> = S extends Signal<infer C> ? C : never
@@ -531,7 +532,7 @@ var grouping_action_callback = function(): void {
         store.tabbee.kwin_window.frameGeometry = target.kwin_window.frameGeometry
         store.grouping_state = GroupingState.SelectingTabbee
 
-        tab_bar_dbus.put_messages([
+        tab_bar.dbus.put_messages([
             new Message("GROUP_DATA", store.tabbee.group.as_payload())
         ])
 

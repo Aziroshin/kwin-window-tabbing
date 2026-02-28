@@ -53,7 +53,7 @@ export class Message<Code = MessageCodes> {
 }
 
 
-export let tab_bar_dbus = {
+export let dbus = {
     _status_callback: function(status: any): void {
         //this.debug("_status_callback of dbus_console called with args: a: " + status + ".")
         if (status !== 'RECEIVED') {
@@ -84,7 +84,7 @@ export let tab_bar_dbus = {
 
 export declare namespace tab_bar {
     export {
-        tab_bar_dbus,
+        dbus,
         Message,
         WindowPayload,
         WindowsPayload,
