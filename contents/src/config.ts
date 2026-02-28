@@ -38,18 +38,6 @@ var config = {
                     }
                 }
             }
-        },
-        dbus_packet_order_experiment: {
-            service: "com.aziroshin.KWinWindowTabbingDBusPacketOrderExperiment",
-            object: "/com/aziroshin/KWinWindowTabbingDBusPacketOrderExperiment",
-            interfaces: {
-                test: {
-                    name: "Test",
-                    methods: {
-                        test: "Test"
-                    }
-                }
-            }
         }
     }
 } as const
