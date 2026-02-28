@@ -635,7 +635,7 @@ var main = function(): void {
         'Cycle Backward Key: Switches one window to the right in its group.',
         // This one doesn't get registered.
         'Meta+Alt+C',
-        cycle_forward_action_callback
+        cycle_backward_action_callback
     );
     workspace.clientAdded.connect((kwin_window: KWin.AbstractClient) => {
         let caption = kwin_window.caption
