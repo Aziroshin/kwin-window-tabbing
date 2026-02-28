@@ -7,28 +7,6 @@ import { Message, GroupPayload, WindowPayload, WindowsPayload, tab_bar_dbus } fr
 type SignalCallbackType<S> = S extends Signal<infer C> ? C : never
 
 
-class CallbackLockupWorkaroundTracker {
-    counter: number
-    last_seen_count: number
-    times_seen_counter_frozen: number
-    timer?: QTimer
-
-    constructor() {
-        this.counter = 0
-        this.last_seen_count = 0
-        this.times_seen_counter_frozen = 0
-    }
-}
-
-
-type CallbackLockupWorkaroundTrackers<TCallbackNames extends string> = {
-    [T in TCallbackNames]: {
-        counter: number
-        last_seen_count: number
-        times_seen_counter_frozen: number
-    }
-}
-
 /** Used to determine how to respond when the grouping toggle is used. */
 enum GroupingState {
     Disabled,
@@ -62,9 +40,7 @@ class Store {
     windows: WrappedGroupableStoreWindows
     test_count: number
     test_count_2: number
-    callback_lockup_workaround_trackers: CallbackLockupWorkaroundTrackers<
-        | "dbus_queue_polling_timer"
-    >
+    dbus_queue_polling_timer: QTimer
 
     constructor() {
         this.groups = new Map<string, Group>
@@ -73,9 +49,7 @@ class Store {
         this.tabbee = this.windows.get_wrapped(workspace.activeClient)
         this.test_count = 0
         this.test_count_2 = 0
-        this.callback_lockup_workaround_trackers = {
-            dbus_queue_polling_timer: new CallbackLockupWorkaroundTracker()
-        }
+        this.dbus_queue_polling_timer = new QTimer()
     }
 }
 
@@ -597,24 +571,18 @@ var cycle_backward_action_callback = function(): void {
 // BEGIN: DBus Queue Polling Functions
 //=========================================================================
 
-/* var dbus_queue_polling_callback = function(): void {
-    store.test_count += 1
-    if (store.test_count % 10 == 0) {
-        //dbg.debug(new Group().get_id())
-        //dbg.log("dbus_queue_polling_callback called. Test count: " + store.test_count)
-        
-    }
-    dbus_packet_order_experiment.dbus_packet_order_experiment.test("kwin-window-tabbing:" + new ID().as_string())
-} */
+var dbus_queue_polling_callback = function(): void {
+    dbg.debug("test: " + new ID().as_string())
+}
 
 
-/* var start_dbus_queue_polling = function(timer: QTimer): void {
-    timer.interval = 1.0
+ var start_dbus_queue_polling = function(timer: QTimer): void {
+    timer.interval = 100.0
     timer.timeout.connect(dbus_queue_polling_callback)
     timer.start()
 }
 
-
+/*
 var stop_dbus_queue_polling = function(timer: QTimer): void {
     timer.timeout.disconnect(dbus_queue_polling_callback)
 }
@@ -623,36 +591,12 @@ var stop_dbus_queue_polling = function(timer: QTimer): void {
 var set_up_dbus_queue_polling = function(): void {
 
 }
-
-
-var reset_dbus_queue_polling = function(): void {
-    store.callback_lockup_workaround_trackers.dbus_queue_polling_timer
-} */
+*/
 
 
 //=========================================================================
 // END: DBus Queue Polling Functions
 //=========================================================================
-
-
-/* var test_timer_callback = function(): void {
-    store.test_count += 1
-    if (store.test_count % 1000 == 0) {
-        //dbg.debug("test_timer_callback called. Test count: " + store.test_count_2)
-    }
-    if (store.test_count == 1) {
-        let dbus_queue_polling_timer_a = new QTimer();
-        dbus_queue_polling_timer_a.interval = 0.1
-        dbus_queue_polling_timer_a.timeout.connect(dbus_queue_polling_callback)
-        dbus_queue_polling_timer_a.start()
-    }
-    if (store.test_count == 7) {
-        let dbus_queue_polling_timer_b = new QTimer();
-        dbus_queue_polling_timer_b.interval = 0.1
-        dbus_queue_polling_timer_b.timeout.connect(dbus_queue_polling_callback)
-        dbus_queue_polling_timer_b.start()
-    }
-} */
 
 
 var main = function(): void {
@@ -718,17 +662,8 @@ var main = function(): void {
         }
         store.groups.get(group_id)?.set_tab_bar_window(new WrappedTabBarWindow(kwin_window))
     })
-    
-/*     let dbus_queue_polling_timer = new QTimer();
-    dbus_queue_polling_timer.interval = 1.0
-    dbus_queue_polling_timer.timeout.connect(dbus_queue_polling_callback)
-    dbus_queue_polling_timer.start() */
-    
-/*     let test_timer = new QTimer();
-    test_timer.interval = 500.0
-    test_timer.timeout.connect(test_timer_callback)
-    test_timer.start() */
 
+    start_dbus_queue_polling(store.dbus_queue_polling_timer)
 }
 
 
