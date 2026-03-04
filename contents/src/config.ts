@@ -33,7 +33,7 @@ var config = {
                 tab_bar: {
                     name: "local.py.main.DBusService",
                     methods: {
-                        pop_commands_queued_for_kwin: "popCommandsQueuedForKwin",
+                        pop_commands_queued_for_kwin: "PopMessages",
                         put_messages: "PutMessages",
                     }
                 }

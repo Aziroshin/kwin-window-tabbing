@@ -60,14 +60,13 @@ export let dbus = {
             dbg.debug('DBus debug connection failed.')
         }
     },
-    pop_commands_queued_for_kwin(): void {
+    pop_messages(callback: (result: any) => void): void {
         callDBus(
             dbus_config.service,
             dbus_config.object,
-            dbus_config.service
-                + '.' + dbus_config.interfaces.tab_bar.name,
+            dbus_config.interfaces.tab_bar.name,
             dbus_config.interfaces.tab_bar.methods.pop_commands_queued_for_kwin,
-            this._status_callback
+            callback
         )
     },
     put_messages(messages: MessageTypes[]): void {

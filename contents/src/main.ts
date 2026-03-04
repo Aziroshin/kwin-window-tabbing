@@ -190,7 +190,7 @@ class Group {
                         toplevel.frameGeometry
                     )
                 }
-            // Even though it's an arrow function we bind here, as it somehow solves the
+            // Even though it's an arrow function we bind here, it somehow solves the
             // issue with `this` being `undefined` in the if-block.
             }) as NonNullable<typeof this.on_top_window_changed_resize_all_callback>).bind(this)
             window.kwin_window.bufferGeometryChanged.connect(
@@ -217,6 +217,7 @@ class Group {
             window.kwin_window.desktopChanged.connect(
                 this.on_top_window_desktop_changed_callback
             )
+            workspace.activeClient = window.kwin_window
         }
 
         return true
@@ -440,6 +441,17 @@ class WrappedGroupableWindows {
         }
     }
 
+    /** Get a window by KWin window ID.
+     * Returns `-1` if no match is found.
+     */
+    get_window_by_id(kwin_window_id: number): WrappedGroupableWindow | null {
+        // TODO: Implement a more efficient way of doing this (e.g. use `Map`).
+        let index = this.all.findIndex((prospective_window) => {
+                return prospective_window.kwin_window.windowId === kwin_window_id
+        })
+        return index === -1 ? null : this.all[index]
+    }
+
     /** Get the window at the top of the stacking order. */
     get_top_stack_window(): WrappedGroupableWindow | null {
         let highest_window: WrappedGroupableWindow | null = null
@@ -577,7 +589,20 @@ var cycle_backward_action_callback = function(): void {
 //=========================================================================
 
 var dbus_queue_polling_callback = function(): void {
-    dbg.debug("test: " + new ID().as_string())
+    tab_bar.dbus.pop_messages((raw_messages) => {
+        let messages = JSON.parse(raw_messages)
+        // Yes, we could just make the tab_bar include the group ID in this
+        // message, but that'd put more responsibility on it. The idea is to
+        // minimize the business logic involvement of the tab_bar to reduce
+        // complexity.
+        // TODO: Get this statically type checked.
+        messages.forEach((message: any) => {
+            if (message["code"] === "REQUEST_TOP_WINDOW_CHANGE") {
+                let window = store.windows.get_window_by_id(Number(message["payload"]["window_id"]))
+                window?.group.set_top_window(window)
+            }
+        })
+    })
 }
 
 

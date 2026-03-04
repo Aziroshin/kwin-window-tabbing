@@ -20,6 +20,7 @@ import PySide6.QtCore
 
 # Imports: Project
 from record import Record, RecordCollection
+import dbus_types
 
 
 DEVFIXTURE_rect = QRect(300, 500, 200, 22)
@@ -29,6 +30,16 @@ SERVICE_NAME = "com.aziroshin.KWinWindowTabbingTabBar"
 OBJECT_NAME = "/com/aziroshin/KWinWindowTabbingTabBar"
 INTERFACE_NAME = "com.aziroshin.KWinWindowTabbingTabBar.TabBar"
 DBUS_RETURN_STATUS_RECEIVED = "RECEIVED"
+
+
+# Makes it possible to __get_attr__ the instance of the type `signal_type` of
+# a `SignalInstance` object without incurring type errors.
+# e.g. if the signal was defined with `str` and you wanted to get that, you'd
+# pass `str` for `signal_type`.
+def signal_type_fix_get_typed(signal: SignalInstance | Signal, signal_type: type) -> SignalInstance:
+    # We're suppressing the warning about __get_item__ not being implemented.
+    return signal[signal_type]  # pyright: ignore [reportUnknownVariableType, reportGeneralTypeIssues]
+
 
 class ContextManagedQTabWidget(QTabWidget):
     def __enter__(self) -> "ContextManagedQTabWidget":
@@ -88,6 +99,11 @@ class Bar:
         with self._widget as widget:
             widget.setGeometry(rect)
 
+    @property
+    def clicked(self) -> SignalInstance:
+        """Emitted when the tab bar widget is clicked."""
+        return self._widget.tabBarClicked
+        
     #def remove_tab(self, )
 
 
@@ -97,14 +113,37 @@ class Window(Record):
     def __init__(self, id: str, caption: str) -> None:
         super().__init__(id)
         self.caption = caption
+    def as_payload_for_kwin(self) -> dbus_types.WindowForKWinPayload:
+        return {
+            "window_id": self.id
+        }
 
 
 class Group(Record):
+    # This exists because `Group` isn't a QObject, so it can't have signals
+    # directly.
+    class Signals(QObject):
+        # Emitted when the tab bar widget is clicked, but with extra steps.
+        # When the tab bar widget is clicked, that signal is captured
+        # in `Group._on_tab_bar_clicked`. The tab index passed via that signal
+        # is then used to find the corresponding window and its KWin window ID.
+        # That ID is then emitted in a ready-to-send-via-DBus message using
+        # this here signal.
+        # TODO: Fix typing/make it more specific.
+        tab_bar_clicked = Signal(
+            #dbus_types.MessageForKWin
+            dict
+        )
+
     bar: Optional[Bar]
     _rect: QRect
     _windows: RecordCollection[Window]
+    signals = Signals()
 
-    def __init__(self, id: str, rect: QRect) -> None:
+    def __init__(
+        self, id: str,
+        rect: QRect
+    ) -> None:
         super().__init__(id)
         self.bar = None
         self.rect = rect
@@ -117,7 +156,9 @@ class Group(Record):
     def on_window_received(self, window: Window) -> None:
         self._windows.append(window)
         if len(self._windows) == 2:
-            self.bar = Bar(self)
+            # This section is why `_create_tab_bar` is static, so `self.bar`
+            # is understood by the type checker to not be `None` here.
+            self.bar = self._create_tab_bar(self)
             self.bar.show()
             self.bar.add_tab_for_window(self._windows[0])
             self.bar.add_tab_for_window(self._windows[1])
@@ -130,9 +171,10 @@ class Group(Record):
         if len(self._windows) == 2:
             self.bar = None
             self._windows.remove_by_id(window_id)
-            
+
     def _remove_window_by_id(self, window_id: str) -> None:
         [self._windows.remove(window) for window in self._windows if window.id == window_id]
+
 
     @property
     def rect(self) -> QRect:
@@ -145,33 +187,70 @@ class Group(Record):
         if self.bar:
             self.bar.rect = rect
 
+    def _on_tab_bar_clicked(self, tab_index: int) -> None:
+        if tab_index < len(self._windows):
+            # TODO: Fix typing.
+            self.signals.tab_bar_clicked.emit(
+                {
+                    "code": "REQUEST_TOP_WINDOW_CHANGE",
+                    # TODO: Needs a way to create an ID.
+                    "id": "",
+                    "payload": self._windows[tab_index].as_payload_for_kwin()
+                }
+            )
 
-# Makes it possible to __get_attr__ the instance of the type `signal_type` of
-# a `SignalInstance` object without incurring type errors.
-# e.g. if the signal was defined with `str` and you wanted to get that, you'd
-# pass `str` for `signal_type`.
-# Also, even though this is referring to `SignalType`, in practice you can
-# just pass a `Signal` object for `signal`.
-def signal_type_fix_get_str(signal: SignalInstance, signal_type: type) -> SignalInstance:
-    # We're suppressing the warning about __get_item__ not being implemented.
-    return signal[signal_type]  # pyright: ignore [reportUnknownVariableType, reportGeneralTypeIssues]
+    # It's static so the result can be assigned at the call site, which
+    # allows the the type checker to infer that `self.bar` is not `None`.
+    @staticmethod
+    def _create_tab_bar(group: "Group") -> Bar:
+        new_bar = Bar(group)
+        new_bar.clicked.connect(group._on_tab_bar_clicked)
+        return new_bar
+            
+
+class MessagesForKWin:
+    _messages: dbus_types.MessagesForKWinList
+
+    def __init__(self):
+        self._messages = []
+
+    def put_message(self, message: dbus_types.MessageForKWin) -> None:
+        self._messages.append(message)
+
+
+    def pop_all_messages_as_json(self) -> str:
+        popped_messages = json.dumps(self._messages)
+        self._messages.clear()
+        return popped_messages
 
 
 class DBusService(QObject):
-    message_put_signal = Signal(str)
+    put_messages_signal = Signal(str)
+    messages_for_kwin = MessagesForKWin()
 
     def __init__(self, parent: PySide6.QtCore.QObject | None = None):
         super().__init__(parent)  # pyright: ignore [reportGeneralTypeIssues]
-        signal_type_fix_get_str(self.message_put_signal, str).connect(self.on_messages_put)
+        signal_type_fix_get_typed(self.put_messages_signal, str).connect(self.on_put_messages)
 
     @Slot(str, result=str)
     def PutMessages(self, raw_messages: str) -> str:
-        self.message_put_signal.emit(raw_messages)
+        """Used by KWin to send us messages."""
+        self.put_messages_signal.emit(raw_messages)
 
         return DBUS_RETURN_STATUS_RECEIVED
 
+    @Slot(result=str)
+    def PopMessages(self) -> str:
+        """Used by KWin to pop the messages we have for it."""
+        return self.messages_for_kwin.pop_all_messages_as_json()
+
     @Slot(str)
-    def on_messages_put(self, messages: str):
+    def on_put_messages(self, messages: str):
+        """Receives messages sent to us.
+
+        Intended to be used by DBus in response to DBus calls by other
+        processes.
+        """
         # Barebones prototype to get enough info out of the message to
         # spawn tabs.
         try:
@@ -181,6 +260,7 @@ class DBusService(QObject):
             print("Below is the JSON error we got related to this:")
             print(traceback.format_exc())
         for message in messages:
+            # TODO: At least get this statically checked. xD;
             if not "code" in message:
                 print("'code' not in message. Message:", message)
                 continue
@@ -202,10 +282,31 @@ class DBusService(QObject):
                         print("'disambiguator' missing in 'group_id' of window. Message:", message)
                         continue
                     group_id = str(window["group_id"]["epoch"]) + "_" + str(window["group_id"]["disambiguator"])
-                    groups.append(Group(group_id, DEVFIXTURE_rect))
+                    if not group_id in groups:
+                        group = Group(group_id, DEVFIXTURE_rect)
+                        groups.append(group)
+                        # TODO: Fix the typing issue with this and replace the line after with this (or similar).
+                        # signal_type_fix_get_typed(
+                        #    groups[group_id].signals.tab_bar_clicked,
+                        #    dbus_types.MessageForKWin
+                        #).connect(self.on_put_message_for_kwin)
+                        groups[group_id].signals.tab_bar_clicked.connect(self.on_put_message_for_kwin)
+                    else:
+                        group = groups[group_id]
                     groups[group_id].on_window_received(Window(str(window["kwin_window_id"]), str(window["caption"])))
         print(messages)
 
+    @Slot(str)
+    def on_put_message_for_kwin(self, message: dbus_types.MessageForKWin) -> None:
+        """Receives messages to be queued for getting collected by KWin.
+
+        Primarily intended for internal code use instead of being a response
+        function to DBus calls, but could be used for a relay if such a thing
+        were ever implemented for some reason.
+        """
+        self.messages_for_kwin.put_message(message)
+
+        
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
