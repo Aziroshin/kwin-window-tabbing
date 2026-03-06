@@ -1,7 +1,6 @@
 import config from "./config";
 import dbg from "./dbg";
 import { ID } from "./id";
-import { Message, GroupPayload, WindowPayload, WindowsPayload } from "./tab_bar";
 import * as tab_bar from "./tab_bar";
 
 
@@ -314,7 +313,7 @@ class Group {
         }
     }
 
-    as_payload(): GroupPayload {
+    as_payload(): tab_bar.GroupPayload {
         return {
             id: this.id,
             windows: this.windows.as_payload(),
@@ -398,7 +397,7 @@ class WrappedGroupableWindow extends WrappedWindow{
         this.group = target_window.group
     }
     
-    as_payload(): WindowPayload {
+    as_payload(): tab_bar.WindowPayload {
         return {
             kwin_window_id: this.kwin_window.windowId,
             group_id: this.group.get_id(),
@@ -467,7 +466,7 @@ class WrappedGroupableWindows {
         return highest_window
     }
 
-    as_payload(): WindowsPayload {
+    as_payload(): tab_bar.WindowPayload[] {
         return this.all.map((window: WrappedGroupableWindow) => window.as_payload())
     }
 }
@@ -545,26 +544,8 @@ var grouping_action_callback = function(): void {
         store.grouping_state = GroupingState.SelectingTabbee
 
         tab_bar.dbus.put_messages([
-            new Message("GROUP_DATA", store.tabbee.group.as_payload())
+            new tab_bar.Message("GROUP_DATA", store.tabbee.group.as_payload())
         ])
-
-        // TODO: Update group on the tab_bar service via DBus. Each update
-        //   is to contain the group ID and a list of windows, whereas the 
-        //   window objects in that list each contain a window ID, title and
-        //   optional icon information of some kind.
-        //   What about group resizing and repositioning, though? It would be
-        //   potentially slow to send and process big updates like that at such
-        //   a rate - maybe these are different DBus messages, and if the group
-        //   isn't recognizd on the other end, it just drops it? That could 
-        //   potentially lead to desyncs, though.
-        //
-        //   This could be avoided by simply moving/resizing the tab bars in
-        //   the KWin script directly. If they're named distinctly and the name
-        //   contains the group ID that'd work.
-        //
-        //   Problem: Updates could still be sent out of order (?) and
-        //   overwrite newer updates. Maybe there's no way around numbering
-        //   messages.
     }
 }
 
@@ -596,9 +577,9 @@ var dbus_queue_polling_callback = function(): void {
         // minimize the business logic involvement of the tab_bar to reduce
         // complexity.
         // TODO: Get this statically type checked.
-        messages.forEach((message: any) => {
+        messages.forEach((message: tab_bar.MessageTypes) => {
             if (message["code"] === "REQUEST_TOP_WINDOW_CHANGE") {
-                let window = store.windows.get_window_by_id(Number(message["payload"]["window_id"]))
+                let window = store.windows.get_window_by_id(Number(message["payload"]["kwin_window_id"]))
                 window?.group.set_top_window(window)
             }
         })
@@ -606,7 +587,7 @@ var dbus_queue_polling_callback = function(): void {
 }
 
 
- var start_dbus_queue_polling = function(timer: QTimer): void {
+var start_dbus_queue_polling = function(timer: QTimer): void {
     timer.interval = 100.0
     timer.timeout.connect(dbus_queue_polling_callback)
     timer.start()

@@ -7,7 +7,9 @@ let dbus_config = config.dbus_services.tab_bar
 
 
 // Payloads could potentially be used in more than one message type, so they
-// get their own type instead of being directly integrated into `MessageTypes`.
+// may get their own type instead of being directly integrated into
+// `MessageTypes`.
+
 
 export type WindowPayload = {
     kwin_window_id: number
@@ -15,16 +17,15 @@ export type WindowPayload = {
     caption: string
 }
 
-export type WindowsPayload = WindowPayload[]
 
 export type GroupPayload = {
     id: ID
-    windows: WindowsPayload
+    windows: WindowPayload[]
     top_window?: WindowPayload
 }
 
 
-type MessageTypes = 
+export type MessageTypes = 
     | {
         code: "GROUP_DATA"
         id: ID
@@ -35,17 +36,28 @@ type MessageTypes =
         id: ID
         payload: WindowPayload
     }
-type MessageCodes = Extract<MessageTypes, {code: string}>["code"]
+    | {
+        code: "REQUEST_TOP_WINDOW_CHANGE"
+        id: ID
+        payload: {
+            kwin_window_id: number
+        }
+    }
+export type MessageCodes = Extract<MessageTypes, {code: string}>["code"]
+export type GetMessageType<CODE extends MessageCodes> = Extract<
+    MessageTypes,
+    {code: CODE, payload?: any}
+>
 type OrNull<T> = unknown extends T ? null : T
-type GetMessagePayload<Code> = OrNull<Extract<MessageTypes, {code: Code, payload?: any}>["payload"]>
+export type GetMessagePayload<CODE extends MessageCodes> = OrNull<GetMessageType<CODE>["payload"]>
 
 
-export class Message<Code = MessageCodes> {
-    code: Code
+export class Message<CODE extends MessageCodes> {
+    code: CODE
     id: ID
-    payload: GetMessagePayload<Code>
+    payload: GetMessagePayload<CODE>
 
-    constructor(code: Code, payload: GetMessagePayload<Code>) {
+    constructor(code: CODE, payload: GetMessagePayload<CODE>) {
         this.code = code
         this.id = new ID()
         this.payload = payload
@@ -84,9 +96,6 @@ export let dbus = {
 export declare namespace tab_bar {
     export {
         dbus,
-        Message,
-        WindowPayload,
-        WindowsPayload,
-        GroupPayload
+        Message
     }
 }

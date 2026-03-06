@@ -7,9 +7,7 @@
 # Imports: Python
 import sys
 import json
-from types import TracebackType
-from typing import Optional, Type
-import traceback
+from typing import Optional
 
 # Imports: Third Party
 from PySide6.QtCore import QRect, Slot, QObject, Signal, SignalInstance
@@ -42,18 +40,24 @@ def signal_type_fix_get_typed(signal: SignalInstance | Signal, signal_type: type
 
 
 class ContextManagedQTabWidget(QTabWidget):
+    """A `QTabWidget` that automatically toggles `updatesEnabled`.
+
+    Disables updates to the widget inside the `with`-statement.
+    Note: `__exit__` always returns `None` and doesn't do any exception
+    handling.
+    """
     def __enter__(self) -> "ContextManagedQTabWidget":
         self.setUpdatesEnabled(False)
         return self
 
-    def __exit__(
-        self,
-        exception_type: Optional[Type[BaseException]],
-        exception_value: Optional[BaseException],
-        exception_traceback: Optional[TracebackType]
-    ) -> None:
+    def __exit__(self, *_) -> None:
         self.setUpdatesEnabled(True)
-        pass
+        # If we do something that causes exceptions in a `with` statement,
+        # we should handle that there. If we make this return a boolean
+        # value, it'll unnecessarily complicate properties like
+        # `Bar.rect`, even though the only reason we context manage
+        # this is for the calls to `setUpdatesEnabled`, not to deal with
+        # exceptions.
 
 
 class Bar:
@@ -114,9 +118,9 @@ class Window(Record):
         super().__init__(id)
         self.caption = caption
     def as_payload_for_kwin(self) -> dbus_types.WindowForKWinPayload:
-        return {
-            "window_id": self.id
-        }
+        return dbus_types.WindowForKWinPayload(
+            kwin_window_id=int(self.id)
+        )
 
 
 class Group(Record):
@@ -219,7 +223,7 @@ class MessagesForKWin:
 
 
     def pop_all_messages_as_json(self) -> str:
-        popped_messages = json.dumps(self._messages)
+        popped_messages = json.dumps(self._messages, cls=dbus_types.JSONEncoder)
         self._messages.clear()
         return popped_messages
 
@@ -229,7 +233,7 @@ class DBusService(QObject):
     messages_for_kwin = MessagesForKWin()
 
     def __init__(self, parent: PySide6.QtCore.QObject | None = None):
-        super().__init__(parent)  # pyright: ignore [reportGeneralTypeIssues]
+        super().__init__(parent)
         signal_type_fix_get_typed(self.put_messages_signal, str).connect(self.on_put_messages)
 
     @Slot(str, result=str)
@@ -245,43 +249,18 @@ class DBusService(QObject):
         return self.messages_for_kwin.pop_all_messages_as_json()
 
     @Slot(str)
-    def on_put_messages(self, messages: str):
+    def on_put_messages(self, raw_messages: str):
         """Receives messages sent to us.
 
         Intended to be used by DBus in response to DBus calls by other
         processes.
         """
-        # Barebones prototype to get enough info out of the message to
-        # spawn tabs.
-        try:
-            messages = json.loads(messages)
-        except json.decoder.JSONDecodeError:
-            print("ERROR: Non-JSON DBus message received for", "PutMessages", "method.", "What we got:", messages)
-            print("Below is the JSON error we got related to this:")
-            print(traceback.format_exc())
+
+        messages = dbus_types.MessagesForTabBar.validate_json(raw_messages)
         for message in messages:
-            # TODO: At least get this statically checked. xD;
-            if not "code" in message:
-                print("'code' not in message. Message:", message)
-                continue
-            if "code" in message and message["code"] == "GROUP_DATA":
-                if not "payload" in message:
-                    print("'payload' key not in 'GROUP_DATA' message. Message:", message)
-                    continue
-                if not "windows" in message["payload"]:
-                    print("'windows' key not in 'GROUP_DATA' payload. Message:", message)
-                    continue
-                for window in message["payload"]["windows"]:
-                    if not "group_id" in window:
-                        print("'group_id' not in window. Message:", message)
-                        continue
-                    if not "epoch" in window["group_id"]:
-                        print("'epoch' missing in 'group_id' of window. Message:", message)
-                        continue
-                    if not "disambiguator" in window["group_id"]:
-                        print("'disambiguator' missing in 'group_id' of window. Message:", message)
-                        continue
-                    group_id = str(window["group_id"]["epoch"]) + "_" + str(window["group_id"]["disambiguator"])
+            if message.code == "GROUP_DATA":
+                for window in message.payload.windows:
+                    group_id = str(window.group_id.epoch) + "_" + str(window.group_id.disambiguator)
                     if not group_id in groups:
                         group = Group(group_id, DEVFIXTURE_rect)
                         groups.append(group)
@@ -293,8 +272,8 @@ class DBusService(QObject):
                         groups[group_id].signals.tab_bar_clicked.connect(self.on_put_message_for_kwin)
                     else:
                         group = groups[group_id]
-                    groups[group_id].on_window_received(Window(str(window["kwin_window_id"]), str(window["caption"])))
-        print(messages)
+                    groups[group_id].on_window_received(Window(str(window.kwin_window_id), str(window.caption)))
+        print("[DEBUG] messages: ", messages)
 
     @Slot(str)
     def on_put_message_for_kwin(self, message: dbus_types.MessageForKWin) -> None:
