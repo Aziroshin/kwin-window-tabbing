@@ -7,7 +7,7 @@
 # Imports: Python
 import sys
 import json
-from typing import Optional
+from typing import Any, Optional
 
 # Imports: Third Party
 from PySide6.QtCore import QRect, Slot, QObject, Signal, SignalInstance
@@ -19,6 +19,7 @@ import PySide6.QtCore
 # Imports: Project
 from record import Record, RecordCollection
 import dbus_types
+from pyside6_typed_signal import PydanticSingleDictSignalWrapper, PydanticSingleDictSlotWrapper
 
 
 DEVFIXTURE_rect = QRect(300, 500, 200, 22)
@@ -30,11 +31,13 @@ INTERFACE_NAME = "com.aziroshin.KWinWindowTabbingTabBar.TabBar"
 DBUS_RETURN_STATUS_RECEIVED = "RECEIVED"
 
 
-# Makes it possible to __get_attr__ the instance of the type `signal_type` of
-# a `SignalInstance` object without incurring type errors.
-# e.g. if the signal was defined with `str` and you wanted to get that, you'd
-# pass `str` for `signal_type`.
+
 def signal_type_fix_get_typed(signal: SignalInstance | Signal, signal_type: type) -> SignalInstance:
+    """Makes it possible to __get_attr__ the instance of the type `signal_type` of
+    a `SignalInstance` object without incurring type errors.
+    e.g. if the signal was defined with `str` and you wanted to get that, you'd
+    pass `str` for `signal_type`.
+    """
     # We're suppressing the warning about __get_item__ not being implemented.
     return signal[signal_type]  # pyright: ignore [reportUnknownVariableType, reportGeneralTypeIssues]
 
@@ -71,8 +74,6 @@ class Bar:
             group_id = group.id
         ))
         self.rect = group.rect
-        #self.resize(int(self.group.rect.width() - DEVFIXTURE_bar_offset * 2), 1)
-        #self.move(group.rect.x() + DEVFIXTURE_bar_offset, group.rect.y())
 
     def show(self) -> None:
         self._widget.show()
@@ -124,34 +125,28 @@ class Window(Record):
 
 
 class Group(Record):
-    # This exists because `Group` isn't a QObject, so it can't have signals
-    # directly.
-    class Signals(QObject):
-        # Emitted when the tab bar widget is clicked, but with extra steps.
-        # When the tab bar widget is clicked, that signal is captured
-        # in `Group._on_tab_bar_clicked`. The tab index passed via that signal
-        # is then used to find the corresponding window and its KWin window ID.
-        # That ID is then emitted in a ready-to-send-via-DBus message using
-        # this here signal.
-        # TODO: Fix typing/make it more specific.
-        tab_bar_clicked = Signal(
-            #dbus_types.MessageForKWin
-            dict
-        )
+
+    # Emitted when the tab bar widget is clicked, but with extra steps.
+    # When the tab bar widget is clicked, that signal is captured
+    # in `Group._on_tab_bar_clicked`. The tab index passed via that signal
+    # is then used to find the corresponding window and its KWin window ID.
+    # That ID is then emitted in a ready-to-send-via-DBus message using
+    # this here signal.
+    tab_bar_clicked: PydanticSingleDictSignalWrapper[dbus_types.MessageForKWin, None]
+            
 
     bar: Optional[Bar]
     _rect: QRect
     _windows: RecordCollection[Window]
-    signals = Signals()
 
     def __init__(
         self, id: str,
         rect: QRect
     ) -> None:
         super().__init__(id)
+        self.tab_bar_clicked = PydanticSingleDictSignalWrapper()
         self.bar = None
         self.rect = rect
-        print("Group init, rect: ", self.rect)
         self._windows = RecordCollection[Window]()
 
     def on_rect_changed(self, changed_rect: QRect) -> None:
@@ -170,15 +165,15 @@ class Group(Record):
             if not self.bar is None:
                 self.bar.add_tab_for_window(window)
 
-    # TODO
+    # TODO: Not used yet.
     def on_window_left(self, window_id: str) -> None:
         if len(self._windows) == 2:
             self.bar = None
             self._windows.remove_by_id(window_id)
-
+    
+    # TODO: Not used yet.
     def _remove_window_by_id(self, window_id: str) -> None:
         [self._windows.remove(window) for window in self._windows if window.id == window_id]
-
 
     @property
     def rect(self) -> QRect:
@@ -186,7 +181,6 @@ class Group(Record):
 
     @rect.setter
     def rect(self, rect: QRect):
-        print("rect setter called")
         self._rect = rect
         if self.bar:
             self.bar.rect = rect
@@ -194,14 +188,13 @@ class Group(Record):
     def _on_tab_bar_clicked(self, tab_index: int) -> None:
         if tab_index < len(self._windows):
             # TODO: Fix typing.
-            self.signals.tab_bar_clicked.emit(
-                {
-                    "code": "REQUEST_TOP_WINDOW_CHANGE",
-                    # TODO: Needs a way to create an ID.
-                    "id": "",
-                    "payload": self._windows[tab_index].as_payload_for_kwin()
-                }
+            message = dbus_types.Message(
+                code = "REQUEST_TOP_WINDOW_CHANGE",
+                # TODO: Needs a way to create an ID.
+                id = dbus_types.ID(epoch = 0, disambiguator = 0),
+                payload = self._windows[tab_index].as_payload_for_kwin()
             )
+            self.tab_bar_clicked.emit(message)
 
     # It's static so the result can be assigned at the call site, which
     # allows the the type checker to infer that `self.bar` is not `None`.
@@ -210,31 +203,50 @@ class Group(Record):
         new_bar = Bar(group)
         new_bar.clicked.connect(group._on_tab_bar_clicked)
         return new_bar
-            
-
-class MessagesForKWin:
-    _messages: dbus_types.MessagesForKWinList
-
-    def __init__(self):
-        self._messages = []
-
-    def put_message(self, message: dbus_types.MessageForKWin) -> None:
-        self._messages.append(message)
-
-
-    def pop_all_messages_as_json(self) -> str:
-        popped_messages = json.dumps(self._messages, cls=dbus_types.JSONEncoder)
-        self._messages.clear()
-        return popped_messages
 
 
 class DBusService(QObject):
+    class _MessagesForKWin:
+        """A pop-everything-at-once-queue for messages for KWin.
+
+        No validation is performed. Only put messages that already passed
+        a stage of either validation or sufficient static type checking.
+        """
+        _messages: list[dict[str, Any]]
+
+        def __init__(self):
+            self._messages = []
+
+        def put_message(self, message: dict[str, Any]) -> None:
+            """Put a message in the queue to be batch-fetched by KWin.
+
+            Doesn't validate and the static typing of this method isn't
+            sufficient. Only put messages that already passed a stage of
+            either validation or sufficient static type checking.
+            """
+            self._messages.append(message)
+
+
+        def pop_all_messages_as_json(self) -> str:
+            """Get all queued messages as JSON and clear the queue.
+
+            There is no validation. We rely upon that only sufficiently
+            checked messages have been queued."""
+            popped_messages = json.dumps(self._messages, cls=dbus_types.JSONEncoder)
+            self._messages.clear()
+            return popped_messages
+
     put_messages_signal = Signal(str)
-    messages_for_kwin = MessagesForKWin()
+    on_put_message_for_kwin: PydanticSingleDictSlotWrapper[dbus_types.MessageForKWin, None]
+    _messages_for_kwin = _MessagesForKWin()
 
     def __init__(self, parent: PySide6.QtCore.QObject | None = None):
         super().__init__(parent)
         signal_type_fix_get_typed(self.put_messages_signal, str).connect(self.on_put_messages)
+        
+        self.on_put_message_for_kwin = PydanticSingleDictSlotWrapper(
+            lambda message: self._messages_for_kwin.put_message(message)
+        )
 
     @Slot(str, result=str)
     def PutMessages(self, raw_messages: str) -> str:
@@ -246,7 +258,7 @@ class DBusService(QObject):
     @Slot(result=str)
     def PopMessages(self) -> str:
         """Used by KWin to pop the messages we have for it."""
-        return self.messages_for_kwin.pop_all_messages_as_json()
+        return self._messages_for_kwin.pop_all_messages_as_json()
 
     @Slot(str)
     def on_put_messages(self, raw_messages: str):
@@ -264,28 +276,11 @@ class DBusService(QObject):
                     if not group_id in groups:
                         group = Group(group_id, DEVFIXTURE_rect)
                         groups.append(group)
-                        # TODO: Fix the typing issue with this and replace the line after with this (or similar).
-                        # signal_type_fix_get_typed(
-                        #    groups[group_id].signals.tab_bar_clicked,
-                        #    dbus_types.MessageForKWin
-                        #).connect(self.on_put_message_for_kwin)
-                        groups[group_id].signals.tab_bar_clicked.connect(self.on_put_message_for_kwin)
+                        groups[group_id].tab_bar_clicked.connect(self.on_put_message_for_kwin)
                     else:
                         group = groups[group_id]
                     groups[group_id].on_window_received(Window(str(window.kwin_window_id), str(window.caption)))
-        print("[DEBUG] messages: ", messages)
-
-    @Slot(str)
-    def on_put_message_for_kwin(self, message: dbus_types.MessageForKWin) -> None:
-        """Receives messages to be queued for getting collected by KWin.
-
-        Primarily intended for internal code use instead of being a response
-        function to DBus calls, but could be used for a relay if such a thing
-        were ever implemented for some reason.
-        """
-        self.messages_for_kwin.put_message(message)
-
-        
+    
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

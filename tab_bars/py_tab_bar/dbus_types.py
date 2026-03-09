@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 
 #Imports: Python
-from typing import Any, Optional, Literal, Union
-from pydantic import BaseModel, TypeAdapter
-from pydantic_core import ValidationError
+from typing import Any, Optional, Literal, Union, LiteralString
+from pydantic import BaseModel, TypeAdapter, ConfigDict, SkipValidation
 import json
 
 
@@ -13,10 +12,12 @@ class ID(BaseModel):
 
 
 # Every message is expected to be of this type.
-class Message[CODE: str, PAYLOAD](BaseModel):
+class Message[CODE: (SkipValidation[LiteralString]), PAYLOAD](BaseModel):
     code: CODE
     id: ID
     payload: PAYLOAD
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
 
 # ====================================
 # Messages & Payloads: From KWin to us
@@ -95,16 +96,12 @@ MessagesForKWin = TypeAdapter(MessageForKWin)
 # ====================================
 
 
-class BadModel(BaseModel):
-    thud: str
-
-
 class JSONEncoder(json.JSONEncoder):
     """Enables the serialization of Pydantic models."""
 
     def default(self, o: Any):
         if isinstance(o, BaseModel):
-            # Since the models are already statically type checked and runtime
-            # validated upon instantiation, we skip validation here.
+            # Since the models are already statically type checked,
+            # we skip validation here.
             return o.model_dump()
         return super().default(o)
