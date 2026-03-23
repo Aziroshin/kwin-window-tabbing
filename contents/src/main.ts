@@ -1,10 +1,8 @@
 import config from "./config";
 import dbg from "./dbg";
 import { ID } from "./id";
+import { Slot } from "./slot";
 import * as tab_bar from "./tab_bar";
-
-
-type SignalCallbackType<S> = S extends Signal<infer C> ? C : never
 
 
 /** Used to determine how to respond when the grouping toggle is used. */
@@ -74,15 +72,9 @@ class Group {
     protected windows: WrappedGroupableWindows
     protected top_window: WrappedGroupableWindow | null
     protected tab_bar_window: WrappedTabBarWindow | null
-    on_top_window_changed_resize_all_callback:
-        | SignalCallbackType<KWin.Toplevel["bufferGeometryChanged"]>
-        | undefined
-    on_top_window_decoration_changed_callback:
-        | SignalCallbackType<KWin.AbstractClient["decorationChanged"]>
-        | undefined
-    on_top_window_desktop_changed_callback:
-        | SignalCallbackType<KWin.AbstractClient["desktopChanged"]>
-        | undefined
+    on_top_window_changed_resize_all_slot = Slot.new<KWin.Toplevel["bufferGeometryChanged"]>()
+    on_top_window_decoration_changed_slot = Slot.new<KWin.AbstractClient["decorationChanged"]>()
+    on_top_window_desktop_changed_slot = Slot.new<KWin.AbstractClient["desktopChanged"]>()
 
     constructor() {
         this.id = new ID()
@@ -152,70 +144,35 @@ class Group {
             return false
         }
 
-        if (this.top_window && this.on_top_window_changed_resize_all_callback) {
-            this.top_window.kwin_window.bufferGeometryChanged.disconnect(
-                this.on_top_window_changed_resize_all_callback
-            )
-        }
-        if (this.top_window && this.on_top_window_decoration_changed_callback) {
-            this.top_window.kwin_window.decorationChanged.disconnect(
-                this.on_top_window_decoration_changed_callback
-            )
-        }
-        if (this.top_window && this.on_top_window_desktop_changed_callback) {
-            this.top_window.kwin_window.desktopChanged.disconnect(
-                this.on_top_window_desktop_changed_callback
-            )
-        }
-
         if (window === null) {
             this.top_window = null
         } else if (this.has_two_or_more_windows()) {
             this.top_window = window
 
-            this.on_top_window_changed_resize_all_callback = (((toplevel) => {
+            this.on_top_window_changed_resize_all_slot.set_function(((toplevel) => {
                 this.set_all_windows_to_geometry(toplevel.frameGeometry)
-
-                // There is some weird issue where `this.tab_bar_window`
-                // suddenly turns `undefined` after the if-check, but only
-                // within the block.
-                // It's also not related to access - accessing the variable
-                // more than once before entering the if-block doesn't change
-                // anything. Ternary expressions or closures (if nested in the
-                // function) aren't affected either.
-                // TODO: Figure out why that happens.
                 if (this.tab_bar_window) {
                     this.tab_bar_window.align_geometry_with_group_by_group_rect(
                         toplevel.frameGeometry
                     )
                 }
-            // Even though it's an arrow function we bind here, it somehow solves the
-            // issue with `this` being `undefined` in the if-block.
-            }) as NonNullable<typeof this.on_top_window_changed_resize_all_callback>).bind(this)
-            window.kwin_window.bufferGeometryChanged.connect(
-                this.on_top_window_changed_resize_all_callback
-            )
-
-            this.on_top_window_decoration_changed_callback = ((() => {
+            }), this).connect(window.kwin_window.bufferGeometryChanged)
+            
+            this.on_top_window_decoration_changed_slot.set_function((() => {
                 if (window.kwin_window.noBorder) {
                     this.disable_decoration()
                 } else {
                     this.enable_decoration()
                 }
-            }) as NonNullable<typeof this.on_top_window_decoration_changed_callback>).bind(this)
-            window.kwin_window.decorationChanged.connect(
-                this.on_top_window_decoration_changed_callback
-            )
+            }), this).connect(window.kwin_window.decorationChanged)
 
-            this.on_top_window_desktop_changed_callback = ((() => {
+            this.on_top_window_desktop_changed_slot.set_function((() => {
                 this.set_desktop_of_all_windows(window.kwin_window.desktop)
                 if (this.tab_bar_window) {
                     this.tab_bar_window.kwin_window.desktop = window.kwin_window.desktop
                 }
-            }) as NonNullable<typeof this.on_top_window_desktop_changed_callback>).bind(this)
-            window.kwin_window.desktopChanged.connect(
-                this.on_top_window_desktop_changed_callback
-            )
+            }), this).connect(window.kwin_window.desktopChanged)
+
             workspace.activeClient = window.kwin_window
         }
 
