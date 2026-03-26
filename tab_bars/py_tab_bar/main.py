@@ -271,15 +271,19 @@ class DBusService(QObject):
         messages = dbus_types.MessagesForTabBar.validate_json(raw_messages)
         for message in messages:
             if message.code == "GROUP_DATA":
+                group_id = str(message.payload.id.epoch) + "_" + str(message.payload.id.disambiguator)
+                
+                group: Group
+                if group_id in groups:
+                    group = groups[group_id]
+                else:
+                    group = Group(group_id, DEVFIXTURE_rect)
+                    groups.append(group)
+                    groups[group_id].tab_bar_clicked.connect(self.on_put_message_for_kwin)
+                    
                 for window in message.payload.windows:
-                    group_id = str(window.group_id.epoch) + "_" + str(window.group_id.disambiguator)
-                    if not group_id in groups:
-                        group = Group(group_id, DEVFIXTURE_rect)
-                        groups.append(group)
-                        groups[group_id].tab_bar_clicked.connect(self.on_put_message_for_kwin)
-                    else:
-                        group = groups[group_id]
-                    groups[group_id].on_window_received(Window(str(window.kwin_window_id), str(window.caption)))
+                    group.on_window_received(Window(str(window.kwin_window_id), str(window.caption)))
+                
     
 
 if __name__ == "__main__":
