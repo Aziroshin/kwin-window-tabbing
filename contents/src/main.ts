@@ -486,7 +486,6 @@ var store = new Store()
 
 
 var grouping_action_callback = function(): void {
-    dbg.log("grouping_action_callback called.")
     if (store.grouping_state == GroupingState.SelectingTabbee) {
         store.tabbee = store.windows.get_wrapped(workspace.activeClient)
         store.grouping_state = GroupingState.SelectingTarget

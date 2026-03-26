@@ -170,7 +170,7 @@ class Group(Record):
         if len(self._windows) == 2:
             self.bar = None
             self._windows.remove_by_id(window_id)
-    
+
     # TODO: Not used yet.
     def _remove_window_by_id(self, window_id: str) -> None:
         [self._windows.remove(window) for window in self._windows if window.id == window_id]
