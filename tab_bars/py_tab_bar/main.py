@@ -31,7 +31,6 @@ INTERFACE_NAME = "com.aziroshin.KWinWindowTabbingTabBar.TabBar"
 DBUS_RETURN_STATUS_RECEIVED = "RECEIVED"
 
 
-
 def signal_type_fix_get_typed(signal: SignalInstance | Signal, signal_type: type) -> SignalInstance:
     """Makes it possible to __get_attr__ the instance of the type `signal_type` of
     a `SignalInstance` object without incurring type errors.
@@ -66,6 +65,7 @@ class ContextManagedQTabWidget(QTabWidget):
 class Bar:
     group: "Group"
     _widget: ContextManagedQTabWidget
+    _indexes_by_window_id: dict[str, int] = {}
 
     def __init__(self, group: "Group") -> None:
         self.group = group
@@ -81,10 +81,17 @@ class Bar:
     def hide(self) -> None:
         self._widget.hide()
 
-    def add_tab_for_window(self, window: "Window") -> None:
+    def append_new_tab_for_window(self, window: "Window") -> None:
+        # We're not interested in the tab's content, since we're just
+        # "misusing" the QTabWidget for its tab bar. Hence the dummy.
         dummy = QWidget()
+        
         with self._widget as widget:
-            widget.addTab(dummy, window.caption)
+            self._indexes_by_window_id[window.id] = widget.addTab(dummy, window.caption)
+
+    def activate_tab_for_window(self, window: "Window") -> None:
+        with self._widget as widget:
+            widget.setCurrentIndex(self._indexes_by_window_id[window.id])
 
     def resize(self, width: int, height: int) -> None:
         with self._widget as widget:
@@ -108,7 +115,7 @@ class Bar:
     def clicked(self) -> SignalInstance:
         """Emitted when the tab bar widget is clicked."""
         return self._widget.tabBarClicked
-        
+    
     #def remove_tab(self, )
 
 
@@ -133,6 +140,7 @@ class Group(Record):
     # That ID is then emitted in a ready-to-send-via-DBus message using
     # this here signal.
     tab_bar_clicked: PydanticSingleDictSignalWrapper[dbus_types.MessageForKWin, None]
+    top_window: Window | None = None
             
 
     bar: Optional[Bar]
@@ -152,18 +160,37 @@ class Group(Record):
     def on_rect_changed(self, changed_rect: QRect) -> None:
         self.rect = changed_rect
 
+    def on_top_window_id_received(self, window_id: str) -> None:
+        window = self._windows.get_by_id(window_id)
+        if window:
+            self._set_top_window(window)
+        else:
+            print("[ERROR] Group got told top_window (ID: {id}) it doesn't have (yet?).".format(
+                id=window_id)
+            )
+
+    def _set_top_window(self, window: Window):
+        self.top_window = window
+        if self.bar:
+            self.bar.activate_tab_for_window(window)
+
     def on_window_received(self, window: Window) -> None:
+        # TODO: Don't add windows we already have.
+
         self._windows.append(window)
         if len(self._windows) == 2:
             # This section is why `_create_tab_bar` is static, so `self.bar`
             # is understood by the type checker to not be `None` here.
             self.bar = self._create_tab_bar(self)
             self.bar.show()
-            self.bar.add_tab_for_window(self._windows[0])
-            self.bar.add_tab_for_window(self._windows[1])
+            self.bar.append_new_tab_for_window(self._windows[0])
+            self.bar.append_new_tab_for_window(self._windows[1])
+            # In case the top window was already set when group size was == 1.
+            if self.top_window:
+                self.bar.activate_tab_for_window(self.top_window)
         elif len(self._windows) > 2:
             if not self.bar is None:
-                self.bar.add_tab_for_window(window)
+                self.bar.append_new_tab_for_window(window)
 
     # TODO: Not used yet.
     def on_window_left(self, window_id: str) -> None:
@@ -172,6 +199,7 @@ class Group(Record):
             self._windows.remove_by_id(window_id)
 
     # TODO: Not used yet.
+    # TODO: Look into what happens when the removed window is the top_window.
     def _remove_window_by_id(self, window_id: str) -> None:
         [self._windows.remove(window) for window in self._windows if window.id == window_id]
 
@@ -283,8 +311,9 @@ class DBusService(QObject):
                     
                 for window in message.payload.windows:
                     group.on_window_received(Window(str(window.kwin_window_id), str(window.caption)))
-                
-    
+                if message.payload.top_window:
+                    group.on_top_window_id_received(str(message.payload.top_window.kwin_window_id))
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
