@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from typing import Generic, Iterator, List, Optional, TypeVar
+from typing import Any, Iterator, List, Optional, TypeGuard
 
 
 class Record:
@@ -9,8 +9,13 @@ class Record:
         self.id = id
 
 
-T_Record = TypeVar("T_Record", bound=Record)
-class RecordCollection(Generic[T_Record]):
+def isRecord(maybe_record: Any) -> TypeGuard["Record"]:
+    if hasattr(maybe_record, "id"):
+        return type(getattr(maybe_record, "id")) == str
+    return False
+
+
+class RecordCollection[T_Record: (Record)]:
     _list: List[T_Record]
 
     def __init__(self) -> None:
@@ -39,7 +44,7 @@ class RecordCollection(Generic[T_Record]):
       return self._list.__iter__()
 
     def __getitem__(self, id_or_index: str | int) -> T_Record:
-        # When writing this as an if-else, the type isn't narroved for the
+        # When writing this as an if-else, the type isn't narrowed for the
         # `str` case (at least for pyright). The two if statements
         # aren't fully encompassing all cases, of course, so we're explicitly
         # defining `record` here.
@@ -54,11 +59,11 @@ class RecordCollection(Generic[T_Record]):
         
         return record
 
-    def __contains__(self, record: str | T_Record) -> bool:
-        if isinstance(record, str) and self.get_by_id(record):
-            return True
-        elif record in self._list:
-            return True
+    def __contains__(self, record_or_id: str | T_Record) -> bool:
+        if isRecord(record_or_id):
+            return not self.get_by_id(record_or_id.id) is None
+        elif isinstance(record_or_id, str):
+            return not self.get_by_id(record_or_id) is None
         return False
 
     def __len__(self) -> int:

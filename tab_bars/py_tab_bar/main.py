@@ -175,7 +175,8 @@ class Group(Record):
             self.bar.activate_tab_for_window(window)
 
     def on_window_received(self, window: Window) -> None:
-        # TODO: Don't add windows we already have.
+        if window in self._windows:
+            return
 
         self._windows.append(window)
         if len(self._windows) == 2:
