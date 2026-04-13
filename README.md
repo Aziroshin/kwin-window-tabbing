@@ -62,3 +62,10 @@ Copies following information from the `package.json` to the `metadata.desktop`:
 - `author`
 - `name`
 - `version`
+
+## Licensing
+
+The project is licensed under [GNU General Public License v2.0 only](LICENSE) except for parts that are public domain or explicitely licensed differently, which are listed below.
+
+### Public Domain Parts
+- [contents/src/bimap.ts](contents/src/bimap.ts)
