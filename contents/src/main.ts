@@ -125,6 +125,7 @@ class Group {
         })
     }
 
+
     // TODO: Rework the whole top window thing to depend on the window
     // returned by `this.get_top_window()`, which should return the
     // window with the highest stackingOrder. The callback management
@@ -532,7 +533,6 @@ var dbus_queue_polling_callback = function(): void {
         // message, but that'd put more responsibility on it. The idea is to
         // minimize the business logic involvement of the tab_bar to reduce
         // complexity.
-        // TODO: Get this statically type checked.
         messages.forEach((message: tab_bar.MessageTypes) => {
             if (message["code"] === "REQUEST_TOP_WINDOW_CHANGE") {
                 let window = store.windows.get_window_by_id(Number(message["payload"]["kwin_window_id"]))

@@ -140,6 +140,9 @@ class Group(Record):
     # That ID is then emitted in a ready-to-send-via-DBus message using
     # this here signal.
     tab_bar_clicked: PydanticSingleDictSignalWrapper[dbus_types.MessageForKWin, None]
+    # TODO: Make protected and replace with getter. It should be clear that
+    # there are only specific ways of canonically setting this, and direct
+    # assignment from outside isn't one of them.
     top_window: Window | None = None
             
 
@@ -147,8 +150,8 @@ class Group(Record):
     _rect: QRect
     _windows: RecordCollection[Window]
 
-    def __init__(
-        self, id: str,
+    def __init__(self,
+        id: str,
         rect: QRect
     ) -> None:
         super().__init__(id)
@@ -216,7 +219,7 @@ class Group(Record):
 
     def _on_tab_bar_clicked(self, tab_index: int) -> None:
         if tab_index < len(self._windows):
-            # TODO: Fix typing.
+            # TODO: Check type sanity.
             message = dbus_types.Message(
                 code = "REQUEST_TOP_WINDOW_CHANGE",
                 # TODO: Needs a way to create an ID.
@@ -297,6 +300,7 @@ class DBusService(QObject):
         processes.
         """
 
+        # TODO: De-spaghettify this.
         messages = dbus_types.MessagesForTabBar.validate_json(raw_messages)
         for message in messages:
             if message.code == "GROUP_DATA":
@@ -311,6 +315,7 @@ class DBusService(QObject):
                     groups[group_id].tab_bar_clicked.connect(self.on_put_message_for_kwin)
                     
                 for window in message.payload.windows:
+                    # TODO: window.caption is already `str`. Remove cast.
                     group.on_window_received(Window(str(window.kwin_window_id), str(window.caption)))
                 if message.payload.top_window:
                     group.on_top_window_id_received(str(message.payload.top_window.kwin_window_id))

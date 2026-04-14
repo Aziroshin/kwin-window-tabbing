@@ -46,7 +46,8 @@ type SlotMaybeWithFunction<SIGNAL extends Signal<any>> = SlotWithFunction<SIGNAL
  *  - `SlotWithoutFunction` when there isn't.
  *
  *  The type `SlotMaybeWithFunction` is a union of those two types and
- *  represents the default state. Variables holding instances of this class
+ *  represents the default state (which is the lowest common denominator of the
+ *  union, `SlotWithoutFunction`). Variables holding instances of this class
  *  should be of that type. That's why the constructor of this class is
  *  private, so the static `.new` method has to be used to obtain a
  *  `SlotMaybeWithFunction`-typed instance.
@@ -56,8 +57,8 @@ class Slot<SIGNAL extends Signal<any>> implements SlotWithFunction<SIGNAL> {
     protected signals = new Set<SIGNAL>()
 
     // Private to enforce use of the static method `.new`, which returns this
-    // as `SlotMaybeWithFunction`. That way, the rvalue doesn't have to be
-    // manually annotated with tha type.
+    // as `SlotMaybeWithFunction`. That way, manual annotation with that type
+    // at the callsite isn't required and the ambiguity is enforced.
     private constructor() {}
 
     /** Obtain a newly constructed instance. */
