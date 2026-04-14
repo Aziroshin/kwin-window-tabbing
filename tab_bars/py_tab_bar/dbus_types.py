@@ -28,6 +28,10 @@ class Message[CODE: (SkipValidation[LiteralString]), PAYLOAD](BaseModel):
 # BEGIN: Payloads
 
 
+class WindowIdForTabBarPayload(BaseModel):
+    kwin_window_id: int
+
+
 class WindowForTabBarPayload(BaseModel):
     kwin_window_id: int
     group_id: ID
@@ -40,6 +44,11 @@ class GroupForTabBarPayload(BaseModel):
     top_window: Optional[WindowForTabBarPayload]
 
 
+class WindowRemovedForTabBarPayload(BaseModel):
+    removed_window: WindowForTabBarPayload
+    top_window_id: WindowIdForTabBarPayload
+
+
 # END: Payloads
 # ===============
 
@@ -47,7 +56,8 @@ class GroupForTabBarPayload(BaseModel):
 # Union of all message types we might receive from KWin.
 type MessageForTabBar = Union[
     Message[Literal["GROUP_DATA"], GroupForTabBarPayload],
-    Message[Literal["TOP_WINDOW"], WindowForTabBarPayload]
+    Message[Literal["TOP_WINDOW"], WindowForTabBarPayload],
+    Message[Literal["WINDOW_REMOVED"], WindowRemovedForTabBarPayload]
 ]
 
 

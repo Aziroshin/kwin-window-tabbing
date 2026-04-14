@@ -1,7 +1,7 @@
 import config from "./config";
 import dbg from "./dbg";
 import { ID } from "./id";
-import { Slot } from "./slot";
+import { Slot, Disconnecter } from "./slot";
 import * as tab_bar from "./tab_bar";
 
 
@@ -75,6 +75,8 @@ class Group {
     on_top_window_changed_resize_all_slot = Slot.new<KWin.Toplevel["bufferGeometryChanged"]>()
     on_top_window_decoration_changed_slot = Slot.new<KWin.AbstractClient["decorationChanged"]>()
     on_top_window_desktop_changed_slot = Slot.new<KWin.AbstractClient["desktopChanged"]>()
+    /** Disconnects all top window related signals once the last window leaves. */
+    top_window_signal_disconnecter = new Disconnecter()
 
     constructor() {
         this.id = new ID()
@@ -157,7 +159,10 @@ class Group {
                         toplevel.frameGeometry
                     )
                 }
-            }), this).connect(window.kwin_window.bufferGeometryChanged)
+            }), this).connect(
+                window.kwin_window.bufferGeometryChanged,
+                this.top_window_signal_disconnecter.get_on_connected_callback()
+            )
             
             this.on_top_window_decoration_changed_slot.set_function((() => {
                 if (window.kwin_window.noBorder) {
@@ -165,14 +170,20 @@ class Group {
                 } else {
                     this.enable_decoration()
                 }
-            }), this).connect(window.kwin_window.decorationChanged)
+            }), this).connect(
+                window.kwin_window.decorationChanged,
+                this.top_window_signal_disconnecter.get_on_connected_callback()
+            )
 
             this.on_top_window_desktop_changed_slot.set_function((() => {
                 this.set_desktop_of_all_windows(window.kwin_window.desktop)
                 if (this.tab_bar_window) {
                     this.tab_bar_window.kwin_window.desktop = window.kwin_window.desktop
                 }
-            }), this).connect(window.kwin_window.desktopChanged)
+            }), this).connect(
+                window.kwin_window.desktopChanged,
+                this.top_window_signal_disconnecter.get_on_connected_callback()
+            )
 
             workspace.activeClient = window.kwin_window
         }
@@ -245,9 +256,13 @@ class Group {
     }
 
     remove_window(window: WrappedGroupableWindow): void {
-        this.windows.remove_window(window)
-        this.ensure_correct_top_window()
-        this.evaluate_wakeness()
+        if (this.windows.remove_window(window)) {
+            if (this.windows.all.length > 0) {
+                this.top_window_signal_disconnecter.disconnect_all()
+            }
+            this.ensure_correct_top_window()
+            this.evaluate_wakeness()
+        }
     }
 
     // Add decor box.
@@ -362,6 +377,12 @@ class WrappedGroupableWindow extends WrappedWindow{
             caption: this.kwin_window.caption
         }
     }
+    
+    as_WindowIdPayload(): tab_bar.WindowIdPayload {
+        return {
+            kwin_window_id: this.kwin_window.windowId
+        }
+    }
 }
 
 
@@ -389,13 +410,26 @@ class WrappedGroupableWindows {
         this.all.push(window)
     }
 
-    remove_window(window_to_remove: WrappedGroupableWindow): void {
+    remove_window(window_to_remove: WrappedGroupableWindow): boolean {
+        dbg.debug("[DEBUG] remove_window(): " + window_to_remove.kwin_window.caption)
         let index = this.all.findIndex((prospective_window) => {
+            if (prospective_window == window_to_remove) {
+            dbg.debug("[DEBUG] found window to remove: " + window_to_remove.kwin_window.caption)}
             return prospective_window == window_to_remove
         })
+        dbg.debug("[DEBUG] index for removing window: " + window_to_remove.kwin_window.caption + ", index: " + index)
         if (index > -1) {
             this.all.splice(index, 1)
+            this.all.forEach((win) => {
+                dbg.debug("[DEBUG] window left: " + win.kwin_window.caption)
+            })
+            return true
         }
+        
+        this.all.forEach((win) => {
+            dbg.debug("[DEBUG] window left: " + win.kwin_window.caption)
+        })
+        return false
     }
 
     /** Get a window by KWin window ID.
@@ -508,7 +542,18 @@ var grouping_action_callback = function(): void {
 
 
 var ungrouping_action_callback = function(): void {
-    dbg.debug('NOT IMPLEMENTED: ungrouping_action_callback.')
+    let window = store.windows.get_window_by_id(workspace.activeClient.windowId)
+    if (!window || !window.is_grouped()) {
+        return
+    }
+
+    window.group.remove_window(window)
+    tab_bar.dbus.put_messages([
+        new tab_bar.Message("WINDOW_REMOVED", {
+            removed_window: window.as_payload(),
+            top_window_id: window.as_WindowIdPayload()
+        })
+    ])
 }
 
 

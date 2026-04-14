@@ -81,6 +81,10 @@ class Bar:
     def hide(self) -> None:
         self._widget.hide()
 
+    def delete(self) -> None:
+        self._widget.close()
+        self._widget.deleteLater()
+
     def append_new_tab_for_window(self, window: "Window") -> None:
         # We're not interested in the tab's content, since we're just
         # "misusing" the QTabWidget for its tab bar. Hence the dummy.
@@ -88,6 +92,11 @@ class Bar:
         
         with self._widget as widget:
             self._indexes_by_window_id[window.id] = widget.addTab(dummy, window.caption)
+
+    def remove_tab_for_window(self, window_id: str) -> None:
+        with self._widget as widget:
+            widget.removeTab(self._indexes_by_window_id[window_id])
+            del self._indexes_by_window_id[window_id]
 
     def activate_tab_for_window(self, window: "Window") -> None:
         with self._widget as widget:
@@ -171,6 +180,7 @@ class Group(Record):
             print("[ERROR] Group got told top_window (ID: {id}) it doesn't have (yet?).".format(
                 id=window_id)
             )
+            self.activate_defunct_state()
 
     def _set_top_window(self, window: Window):
         self.top_window = window
@@ -196,16 +206,81 @@ class Group(Record):
             if not self.bar is None:
                 self.bar.append_new_tab_for_window(window)
 
-    # TODO: Not used yet.
-    def on_window_left(self, window_id: str) -> None:
-        if len(self._windows) == 2:
-            self.bar = None
-            self._windows.remove_by_id(window_id)
+    # This gets called when we get notified of the KWin script having removed
+    # a window.
+    # Since we'll need to know which one is the new top window in case the
+    # window that got removed was the current top window, we also take a
+    # `top_window_id` here.
+    #
+    # `top_window_id` may only be `None` if the removed window was the last
+    # in the group, since then no window would be left to be the top window.
+    # In the current implementation, if `top_window_id` is `None` in any
+    # other case, the tab bar is hidden to prevent misleading the user.
+    def on_window_removed(self,
+        id_of_removed_window: str,
+        top_window_id: str | None
+    ) -> None:
+        if not id_of_removed_window in self._windows:
+            print((
+                "[ERROR] Tried removing window (ID: {window_id}) from group "
+                "(ID: {group_id}) that doesn't have it."
+                ).format(
+                    window_id=id_of_removed_window,
+                    group_id=self.id
+                )
+            )
+            return
 
-    # TODO: Not used yet.
-    # TODO: Look into what happens when the removed window is the top_window.
-    def _remove_window_by_id(self, window_id: str) -> None:
-        [self._windows.remove(window) for window in self._windows if window.id == window_id]
+        if len(self._windows) > 1:
+            if top_window_id == None:
+                print((
+                    "[ERROR] Received window removal (window ID: {window_id}) "
+                    "for group (ID: {group_id}) with more than one window, but "
+                    "the provided top window (ID: {top_window_id}) is `None`, "
+                    "which is only allowed if the removed window was the last "
+                    "window in the group."
+                    ).format(
+                        window_id=id_of_removed_window,
+                        group_id=self.id,
+                        top_window_id=top_window_id
+                    )
+                )
+                # TODO: This is a serious issue that either needs proper recovery
+                # or should result either in a very visible error state or outright
+                # hide the entire tab bar for that group. Showing the wrong tab 
+                # as active could result in making the user think they're in a
+                # different application/folder/document than they really are, with
+                # potentially disastrous consequences.
+                self.activate_defunct_state()
+                return
+
+            if len(self._windows) == 2:
+                self._delete_tab_bar()
+            self.on_top_window_id_received(top_window_id)
+        elif len(self._windows) == 1:
+            self.top_window = None
+
+        self._remove_window(id_of_removed_window)
+
+    def _remove_window(self, id_of_removed_window: str) -> None:
+        if self.bar:
+            self.bar.remove_tab_for_window(id_of_removed_window)
+        self._windows.remove_by_id(id_of_removed_window)
+
+    def activate_defunct_state(self) -> None:
+        """Helps avoid dangerous UX situations by warning and/or disabling functionality.
+
+        Intended for when errors are detected that could make it dangerous to continue
+        making the UI available as-is.
+
+        In the current implementation, this simply hides the tab bar.
+        """
+        # Just hiding the tab bar and doing nothing else is going to be very
+        # irritating, as the grouping will still be active - but it'll have
+        # to do for now.
+        if self.bar:
+            self.bar.hide()
+        print("[ERROR] Defunct state activated for group (ID: {id}).".format(id=self.id))
 
     @property
     def rect(self) -> QRect:
@@ -235,6 +310,16 @@ class Group(Record):
         new_bar = Bar(group)
         new_bar.clicked.connect(group._on_tab_bar_clicked)
         return new_bar
+
+    def _delete_tab_bar(self) -> None:
+        if self.bar is None:
+            print("[ERROR] Attempted to delete non-existant tab bar on group (ID: {id})".format(
+                id=self.id)
+            )
+            return
+        self.bar.clicked.disconnect(self._on_tab_bar_clicked)
+        self.bar.delete()
+        self.bar = None
 
 
 class DBusService(QObject):
@@ -319,10 +404,20 @@ class DBusService(QObject):
                     group.on_window_received(Window(str(window.kwin_window_id), str(window.caption)))
                 if message.payload.top_window:
                     group.on_top_window_id_received(str(message.payload.top_window.kwin_window_id))
+            
+            elif message.code == "WINDOW_REMOVED":
+                group_id = str(message.payload.removed_window.group_id.epoch) + "_" + str(message.payload.removed_window.group_id.disambiguator)
+                if group_id in groups:
+                    group = groups[group_id]
+                    group.on_window_removed(
+                        str(message.payload.removed_window.kwin_window_id),
+                        str(message.payload.top_window_id.kwin_window_id)
+                    )
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
     groups = RecordCollection[Group]()
 
     dbus = QDBusConnection.sessionBus()

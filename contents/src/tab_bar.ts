@@ -11,6 +11,11 @@ let dbus_config = config.dbus_services.tab_bar
 // `MessageTypes`.
 
 
+export type WindowIdPayload = {
+    kwin_window_id: number
+}
+
+
 export type WindowPayload = {
     kwin_window_id: number
     group_id: ID
@@ -22,6 +27,12 @@ export type GroupPayload = {
     id: ID
     windows: WindowPayload[]
     top_window?: WindowPayload
+}
+
+
+export type WindowRemovedPayload = {
+    removed_window: WindowPayload
+    top_window_id: WindowIdPayload
 }
 
 
@@ -39,9 +50,12 @@ export type MessageTypes =
     | {
         code: "REQUEST_TOP_WINDOW_CHANGE"
         id: ID
-        payload: {
-            kwin_window_id: number
-        }
+        payload: WindowIdPayload
+    }
+    | {
+        code: "WINDOW_REMOVED"
+        id: ID
+        payload: WindowRemovedPayload
     }
 export type MessageCodes = Extract<MessageTypes, {code: string}>["code"]
 export type GetMessageType<CODE extends MessageCodes> = Extract<
