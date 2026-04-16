@@ -2,7 +2,7 @@
   "pythonVersion": "3.12",
   "ignore": [],
   "extraPaths": [],
-  "venvPath": ".venv",
+  "venvPath": "venv",
   "typeCheckingMode": "strict",
   "verboseOutput": true,
   "stubPath": "",
