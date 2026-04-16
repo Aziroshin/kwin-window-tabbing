@@ -66,7 +66,7 @@ type MessagesForTabBarList = list[MessageForTabBar]
 
 # The type of the list of messages we receive from KWin
 # when we receive messages in bulk.
-MessagesForTabBar = TypeAdapter(MessagesForTabBarList)
+MessagesForTabBar = TypeAdapter[MessagesForTabBarList](MessagesForTabBarList)
 
 
 # ====================================
@@ -98,7 +98,7 @@ type MessagesForKWinList = list[MessageForKWin]
 
 # The type of the list of messages we send to KWin
 # when we send messages in bulk.
-MessagesForKWin = TypeAdapter(MessageForKWin)
+MessagesForKWin = TypeAdapter[MessageForKWin](MessageForKWin)
 
 
 # ====================================

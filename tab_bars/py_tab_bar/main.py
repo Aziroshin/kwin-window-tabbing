@@ -38,7 +38,7 @@ def signal_type_fix_get_typed(signal: SignalInstance | Signal, signal_type: type
     pass `str` for `signal_type`.
     """
     # We're suppressing the warning about __get_item__ not being implemented.
-    return signal[signal_type]  # pyright: ignore [reportUnknownVariableType, reportGeneralTypeIssues]
+    return signal[signal_type]  # pyright: ignore reportIndexIssue
 
 
 class ContextManagedQTabWidget(QTabWidget):
