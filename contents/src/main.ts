@@ -612,40 +612,29 @@ var set_up_dbus_queue_polling = function(): void {
 
 
 var main = function(): void {
-    // TODO: There are some comments below about which keys are getting registered
-    //   and which aren't - this probably depends on one's setup and might differ
-    //   between setups. Figure out what the problem is and fix it. It doesn't seem
-    //   to be tied to existing shortcuts, at least not ones that can be found in
-    //   the `Shortcuts` control panel using the search bar.
     registerShortcut(
-        // TODO [bug]: Title doesn't show up in system settings.
-        'Grouping Key',
+        'Grouping (kwt)',
         // TODO: Description is too long for system settings.
         // Title included is included here for now.
-        'Grouping Key: First use selects focused window for getting tabbed, second use selects a window to tab it to.',
-        // TODO [bug]: Somehow the shortcut doesn't get set - for now, we have to
-        //   set the shortcut ourselves in the system settings.
+        'Grouping (kwt): First use selects window for getting tabbed, second use selects a window to tab it to',
         'Meta+Space',
         grouping_action_callback
     );
     registerShortcut(
-        'Ungrouping Key',
-        'Ungrouping Key: Removes the focused window from its group.',
-        // Interestingly, this one is getting registered right away.
+        'Ungrouping (kwt)',
+        'Ungrouping (kwt): Removes the focused window from its group',
         'Meta+Alt+Space',
         ungrouping_action_callback
     );
     registerShortcut(
-        'Cycle Forward Key',
-        'Cycle Forward Key: Switches one window to the left in its group.',
-        // This one gets registered as well.
+        'Cycle Forward (kwt)',
+        'Cycle Forward (kwt): Switches one window to the left in its group',
         'Meta+Alt+F',
         cycle_forward_action_callback
     );
     registerShortcut(
-        'Cycle Backward Key',
-        'Cycle Backward Key: Switches one window to the right in its group.',
-        // This one doesn't get registered.
+        'Cycle Backward (kwt)',
+        'Cycle Backward (kwt): Switches one window to the right in its group',
         'Meta+Alt+C',
         cycle_backward_action_callback
     );
