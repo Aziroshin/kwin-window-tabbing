@@ -628,14 +628,14 @@ var main = function(): void {
     );
     registerShortcut(
         'Cycle Forward (kwt)',
-        'Cycle Forward (kwt): Switches one window to the left in its group',
-        'Meta+Alt+D',
+        'Cycle Forward (kwt): Switches one window to the right in its group',
+        'Meta+Alt+F',
         cycle_forward_action_callback
     );
     registerShortcut(
         'Cycle Backward (kwt)',
-        'Cycle Backward (kwt): Switches one window to the right in its group',
-        'Meta+Alt+F',
+        'Cycle Backward (kwt): Switches one window to the left in its group',
+        'Meta+Alt+D',
         cycle_backward_action_callback
     );
     workspace.clientAdded.connect((kwin_window: KWin.AbstractClient) => {
