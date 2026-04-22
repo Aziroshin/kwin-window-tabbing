@@ -14,7 +14,8 @@ of the template.
 
 - Adding and removing windows to/from a group using a shortcut.
 - Grouped windows have a tab bar above them that allows for switching between windows.
-- Window resizing and border toggling gets applied to all grouped windows in unison.
+- Window resizing, repositioning and border toggling gets applied to all grouped
+windows in unison.
 - The tab bar gets resized and moves virtual desktops with its group.
 
 ## What Does Not Work (Yet?)
