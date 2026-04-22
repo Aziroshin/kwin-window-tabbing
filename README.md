@@ -36,7 +36,7 @@ to abort it either if one changes one's mind.
 - No persistence - restarts of KWin or the KWin script will reset all groups and
 restarts of the companion program will remove all tab bars.
 - Tab bar is still displayed in window lists.
-- The caption and icon of the current tab bar dont reflect the group's current
+- The caption and icon of the tab bar dont reflect the group's current
 top window.
 - When reactivating monitors in a multi-monitor setup, windows may be somewhere
 else, disconnected from their tab bars.
@@ -112,12 +112,20 @@ this purpose. Steps to set it up:
   - Refer to [requirements.txt](tab_bars/py_tab_bar/requirements.txt) to see
   the list of dependencies it'll install.
 
-### Notes
+## Running Things
 
-- The KWin script sources are in `contents/src`.
+- `cd tab_bars/py_tab_bar && ./main.py` will run the companion program for
+the tab bars.
 - `npm run dbus_printer` will start a DBus service the KWin script may print
 to using `dbg.log`, `dbg.info` or `dbg.debug`.
-- `npm run start` will recompile/load the script.
+- `npm run start` will recompile/load the KWin script.
+
+## Source Code & Development Notes
+
+- The KWin script sources are in `contents/src`.
+- The companion program for the tab bars is in `tab_bars/py_tab_bar`.
+- The python language server of choice for this project is
+[basedpyright](https://github.com/detachhead/basedpyright).
 
 ## NPM Lifecycle Scripts
 
